@@ -1,4 +1,5 @@
-enum TokenType {
+#[derive(Debug, PartialEq)]
+pub enum TokenType {
     Illegal,
     EOF,
 
@@ -12,7 +13,7 @@ enum TokenType {
     SEMICOLON,
 
     LPAREN,
-    RPARENT,
+    RPAREN,
     LBRACE,
     RBRACE,
 
