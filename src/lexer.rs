@@ -31,6 +31,12 @@ impl Lexer {
             b')' => (TokenType::RPAREN, char::from(self.char).to_string()),
             b',' => (TokenType::COMMA, char::from(self.char).to_string()),
             b'+' => (TokenType::PLUS, char::from(self.char).to_string()),
+            b'-' => (TokenType::MINUS, char::from(self.char).to_string()),
+            b'/' => (TokenType::SLASH, char::from(self.char).to_string()),
+            b'*' => (TokenType::ASTERISK, char::from(self.char).to_string()),
+            b'<' => (TokenType::LT, char::from(self.char).to_string()),
+            b'>' => (TokenType::GT, char::from(self.char).to_string()),
+            b'!' => (TokenType::BANG, char::from(self.char).to_string()),
             b'{' => (TokenType::LBRACE, char::from(self.char).to_string()),
             b'}' => (TokenType::RBRACE, char::from(self.char).to_string()),
             0 => (TokenType::EOF, char::from(0).to_string()),
@@ -40,13 +46,13 @@ impl Lexer {
                 // early return, as `read_identifier` already moves the reading
                 // position to the next char
                 return Token::new(resolve_ident(&ident), ident);
-            },
+            }
             x if is_digit(x) => {
                 let number = self.read_number();
 
                 // early return, as `read_identifier` already moves the reading
                 // position to the next char
-                return Token::new(TokenType::INT, number)
+                return Token::new(TokenType::INT, number);
             }
             _ => (TokenType::ILLEGAL, char::from(self.char).to_string()),
         };
@@ -118,7 +124,9 @@ let add = fn(x, y) {
 };
 
 let result = add(five, ten);
-        ";
+!-/*5;
+5 < 10 > 5;
+";
 
         let expected = [
             Token::new(TokenType::LET, "let".to_string()),
@@ -156,6 +164,18 @@ let result = add(five, ten);
             Token::new(TokenType::COMMA, ",".to_string()),
             Token::new(TokenType::IDENT, "ten".to_string()),
             Token::new(TokenType::RPAREN, ")".to_string()),
+            Token::new(TokenType::SEMICOLON, ";".to_string()),
+            Token::new(TokenType::BANG, "!".to_string()),
+            Token::new(TokenType::MINUS, "-".to_string()),
+            Token::new(TokenType::SLASH, "/".to_string()),
+            Token::new(TokenType::ASTERISK, "*".to_string()),
+            Token::new(TokenType::INT, "5".to_string()),
+            Token::new(TokenType::SEMICOLON, ";".to_string()),
+            Token::new(TokenType::INT, "5".to_string()),
+            Token::new(TokenType::LT, "<".to_string()),
+            Token::new(TokenType::INT, "10".to_string()),
+            Token::new(TokenType::GT, ">".to_string()),
+            Token::new(TokenType::INT, "5".to_string()),
             Token::new(TokenType::SEMICOLON, ";".to_string()),
             Token::new(TokenType::EOF, "\0".to_string()),
         ];
