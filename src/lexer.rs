@@ -128,7 +128,12 @@ let add = fn(x, y) {
 let result = add(five, ten);
 !-/*5;
 5 < 10 > 5;
-";
+
+if(5 < 10) {
+  return true;
+} else {
+  return false;
+}";
 
         let expected = [
             Token::new(TokenType::LET, "let".to_string()),
@@ -179,6 +184,23 @@ let result = add(five, ten);
             Token::new(TokenType::GT, ">".to_string()),
             Token::new(TokenType::INT, "5".to_string()),
             Token::new(TokenType::SEMICOLON, ";".to_string()),
+            Token::new(TokenType::IF, "if".to_string()),
+            Token::new(TokenType::LPAREN, "(".to_string()),
+            Token::new(TokenType::INT, "5".to_string()),
+            Token::new(TokenType::LT, "<".to_string()),
+            Token::new(TokenType::INT, "10".to_string()),
+            Token::new(TokenType::RPAREN, ")".to_string()),
+            Token::new(TokenType::LBRACE, "{".to_string()),
+            Token::new(TokenType::RETURN, "return".to_string()),
+            Token::new(TokenType::TRUE, "true".to_string()),
+            Token::new(TokenType::SEMICOLON, ";".to_string()),
+            Token::new(TokenType::RBRACE, "}".to_string()),
+            Token::new(TokenType::ELSE, "else".to_string()),
+            Token::new(TokenType::LBRACE, "{".to_string()),
+            Token::new(TokenType::RETURN, "return".to_string()),
+            Token::new(TokenType::FALSE, "false".to_string()),
+            Token::new(TokenType::SEMICOLON, ";".to_string()),
+            Token::new(TokenType::RBRACE, "}".to_string()),
             Token::new(TokenType::EOF, "\0".to_string()),
         ];
 
