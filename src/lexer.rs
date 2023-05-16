@@ -24,21 +24,23 @@ impl Lexer {
     fn next_token(&mut self) -> Token {
         self.skip_whitespace();
 
+        let literal_string = char::from(self.char).to_string();
+
         let (token_type, literal) = match self.char {
-            b'=' => (TokenType::ASSIGN, char::from(self.char).to_string()),
-            b';' => (TokenType::SEMICOLON, char::from(self.char).to_string()),
-            b'(' => (TokenType::LPAREN, char::from(self.char).to_string()),
-            b')' => (TokenType::RPAREN, char::from(self.char).to_string()),
-            b',' => (TokenType::COMMA, char::from(self.char).to_string()),
-            b'+' => (TokenType::PLUS, char::from(self.char).to_string()),
-            b'-' => (TokenType::MINUS, char::from(self.char).to_string()),
-            b'/' => (TokenType::SLASH, char::from(self.char).to_string()),
-            b'*' => (TokenType::ASTERISK, char::from(self.char).to_string()),
-            b'<' => (TokenType::LT, char::from(self.char).to_string()),
-            b'>' => (TokenType::GT, char::from(self.char).to_string()),
-            b'!' => (TokenType::BANG, char::from(self.char).to_string()),
-            b'{' => (TokenType::LBRACE, char::from(self.char).to_string()),
-            b'}' => (TokenType::RBRACE, char::from(self.char).to_string()),
+            b'=' => (TokenType::ASSIGN, literal_string),
+            b';' => (TokenType::SEMICOLON, literal_string),
+            b'(' => (TokenType::LPAREN, literal_string),
+            b')' => (TokenType::RPAREN, literal_string),
+            b',' => (TokenType::COMMA, literal_string),
+            b'+' => (TokenType::PLUS, literal_string),
+            b'-' => (TokenType::MINUS, literal_string),
+            b'/' => (TokenType::SLASH, literal_string),
+            b'*' => (TokenType::ASTERISK, literal_string),
+            b'<' => (TokenType::LT, literal_string),
+            b'>' => (TokenType::GT, literal_string),
+            b'!' => (TokenType::BANG, literal_string),
+            b'{' => (TokenType::LBRACE, literal_string),
+            b'}' => (TokenType::RBRACE, literal_string),
             0 => (TokenType::EOF, char::from(0).to_string()),
             x if is_letter(x) => {
                 let ident = self.read_identifier();
@@ -54,7 +56,7 @@ impl Lexer {
                 // position to the next char
                 return Token::new(TokenType::INT, number);
             }
-            _ => (TokenType::ILLEGAL, char::from(self.char).to_string()),
+            _ => (TokenType::ILLEGAL, literal_string),
         };
 
         self.read_char();
