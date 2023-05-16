@@ -21,7 +21,17 @@ pub enum TokenType {
     LET,
 }
 
-struct Token {
+#[derive(Debug, PartialEq)]
+pub struct Token {
     token_type: TokenType,
     literal: String,
+}
+
+impl Token {
+    pub fn new(token_type: TokenType, literal: String) -> Self {
+        Self {
+            token_type,
+            literal,
+        }
+    }
 }
