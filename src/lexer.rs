@@ -27,7 +27,14 @@ impl Lexer {
         let literal_string = char::from(self.char).to_string();
 
         let (token_type, literal) = match self.char {
-            b'=' => (TokenType::ASSIGN, literal_string),
+            b'=' => match self.peek_char() {
+                b'=' => {
+                    self.read_char();
+                    let next_char = char::from(self.char);
+                    (TokenType::EQ, format!("{}{}", literal_string, next_char))
+                }
+                _ => (TokenType::ASSIGN, literal_string),
+            },
             b';' => (TokenType::SEMICOLON, literal_string),
             b'(' => (TokenType::LPAREN, literal_string),
             b')' => (TokenType::RPAREN, literal_string),
@@ -38,7 +45,14 @@ impl Lexer {
             b'*' => (TokenType::ASTERISK, literal_string),
             b'<' => (TokenType::LT, literal_string),
             b'>' => (TokenType::GT, literal_string),
-            b'!' => (TokenType::BANG, literal_string),
+            b'!' => match self.peek_char() {
+                b'=' => {
+                    self.read_char();
+                    let next_char = char::from(self.char);
+                    (TokenType::NEQ, format!("{}{}", literal_string, next_char))
+                }
+                _ => (TokenType::BANG, literal_string),
+            },
             b'{' => (TokenType::LBRACE, literal_string),
             b'}' => (TokenType::RBRACE, literal_string),
             0 => (TokenType::EOF, char::from(0).to_string()),
@@ -94,6 +108,14 @@ impl Lexer {
         self.input[position..self.position].to_string()
     }
 
+    fn peek_char(&self) -> u8 {
+        if self.read_position >= self.input.len() {
+            0
+        } else {
+            self.input.as_bytes()[self.read_position]
+        }
+    }
+
     fn skip_whitespace(&mut self) {
         while self.char == b' ' || self.char == b'\t' || self.char == b'\n' || self.char == b'\r' {
             self.read_char();
@@ -133,7 +155,11 @@ if(5 < 10) {
   return true;
 } else {
   return false;
-}";
+}
+
+10 == 10;
+10 != 9;
+";
 
         let expected = [
             Token::new(TokenType::LET, "let".to_string()),
@@ -201,6 +227,14 @@ if(5 < 10) {
             Token::new(TokenType::FALSE, "false".to_string()),
             Token::new(TokenType::SEMICOLON, ";".to_string()),
             Token::new(TokenType::RBRACE, "}".to_string()),
+            Token::new(TokenType::INT, "10".to_string()),
+            Token::new(TokenType::EQ, "==".to_string()),
+            Token::new(TokenType::INT, "10".to_string()),
+            Token::new(TokenType::SEMICOLON, ";".to_string()),
+            Token::new(TokenType::INT, "10".to_string()),
+            Token::new(TokenType::NEQ, "!=".to_string()),
+            Token::new(TokenType::INT, "9".to_string()),
+            Token::new(TokenType::SEMICOLON, ";".to_string()),
             Token::new(TokenType::EOF, "\0".to_string()),
         ];
 
