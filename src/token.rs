@@ -35,3 +35,12 @@ impl Token {
         }
     }
 }
+
+pub fn resolve_ident(ident: &String) -> TokenType {
+    match ident.as_str() {
+        "fn" => TokenType::FUNCTION,
+        "let" => TokenType::LET,
+        _ => TokenType::IDENT,
+    }
+}
+
