@@ -131,7 +131,7 @@ impl Parser {
 
                 Some(Expression::PrefixExpr(Prefix {
                     operator,
-                    right: Box::new(self.parse_expression(Precedence::Prefix)?)
+                    right: Box::new(self.parse_expression(Precedence::Prefix)?),
                 }))
             }
             _ => None,
@@ -306,33 +306,20 @@ return 69420;
 
     #[test]
     fn parses_bang_prefix_expression() {
-        let input = "!5;".to_string();
-
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-
-        let program = parser.parse_program();
-        assert_eq!(0, parser.errors.len());
-
-        assert_eq!(1, program.statements.len());
-
-        let stmt = &program.statements[0];
-        if let Statement::ExpressionStmt(ExpressionStatement {
-            expression: Expression::PrefixExpr(expr),
-        }) = stmt
-        {
-            assert_eq!("!", expr.operator);
-            test_integer_literal(&*expr.right, 5);
-        } else {
-            panic!("Incorrect statement type in test. Expected: ExpressionStatement with PrefixExpression. Got {:?}", stmt);
-        }
+        test_prefix_expression("!5;".to_string(), "!".to_string(), 5);
     }
 
     #[test]
     fn parses_minus_prefix_expression() {
-        let input = "-15;".to_string();
+        test_prefix_expression("-15;".to_string(), "-".to_string(), 15);
+    }
 
-        let lexer = Lexer::new(input);
+    fn test_prefix_expression(
+        expression: String,
+        expected_operator: String,
+        expected_right_value: isize,
+    ) {
+        let lexer = Lexer::new(expression);
         let mut parser = Parser::new(lexer);
 
         let program = parser.parse_program();
@@ -345,8 +332,8 @@ return 69420;
             expression: Expression::PrefixExpr(expr),
         }) = stmt
         {
-            assert_eq!("-", expr.operator);
-            test_integer_literal(&*expr.right, 15);
+            assert_eq!(expected_operator, expr.operator);
+            test_integer_literal(&*expr.right, expected_right_value);
         } else {
             panic!("Incorrect statement type in test. Expected: ExpressionStatement with PrefixExpression. Got {:?}", stmt);
         }
