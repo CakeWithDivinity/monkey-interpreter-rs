@@ -1,5 +1,7 @@
+use std::any::Any;
+
 use crate::{
-    ast::{Expression, Identifier, Let, Program, Return, Statement},
+    ast::{Expression, ExpressionStatement, Identifier, Let, Program, Return, Statement},
     lexer::Lexer,
     token::{Token, TokenType},
 };
@@ -48,10 +50,7 @@ impl Parser {
         match &self.current_token.token_type {
             TokenType::LET => Ok(Statement::LetStmt(self.parse_let_statement()?)),
             TokenType::RETURN => Ok(Statement::ReturnStmt(self.parse_return_statement()?)),
-            token_type => Err(ParseError::UnexpectedToken(UnexpectedTokenError::new(
-                TokenType::LET,
-                token_type,
-            ))),
+            _ => Ok(Statement::ExpressionStmt(self.parse_expression_statement())),
         }
     }
 
@@ -88,6 +87,29 @@ impl Parser {
         });
     }
 
+    fn parse_expression_statement(&mut self) -> ExpressionStatement {
+        let expression = self.parse_expression(Precedence::Lowest).unwrap();
+
+        if self.peek_token.token_type == TokenType::SEMICOLON {
+            self.next_token();
+        }
+
+        ExpressionStatement { expression }
+    }
+
+    fn parse_expression(&self, precedence: Precedence) -> Option<Expression> {
+        self.parse_prefix_expression(&self.current_token.token_type)
+    }
+
+    fn parse_prefix_expression(&self, token_type: &TokenType) -> Option<Expression> {
+        match token_type {
+            TokenType::IDENT => Some(Expression::IdentifierExpr(Identifier {
+                value: self.current_token.literal.to_owned(),
+            })),
+            _ => None,
+        }
+    }
+
     fn assert_peek_token(&mut self, expected_type: TokenType) -> Result<(), ParseError> {
         if self.peek_token.token_type == expected_type {
             self.next_token();
@@ -99,6 +121,16 @@ impl Parser {
             &self.peek_token.token_type,
         )))
     }
+}
+
+enum Precedence {
+    Lowest = 1,
+    Equals = 2,
+    LessGreater = 3,
+    Sum = 4,
+    Product = 5,
+    Prefix = 6,
+    Call = 7,
 }
 
 #[derive(Debug)]
@@ -125,7 +157,10 @@ impl UnexpectedTokenError {
 mod tests {
     use std::assert_eq;
 
-    use crate::{ast::Statement, lexer::Lexer};
+    use crate::{
+        ast::{Expression, ExpressionStatement, Statement},
+        lexer::Lexer,
+    };
 
     use super::Parser;
 
@@ -194,17 +229,25 @@ return 69420;
     }
 
     #[test]
-    fn reports_errors() {
-        let input = "
-let x 5;
-        "
-        .to_string();
+    fn parses_identifier_expression() {
+        let input = "foobar;".to_string();
 
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
 
-        parser.parse_program();
+        let program = parser.parse_program();
+        assert_eq!(0, parser.errors.len());
 
-        assert_eq!(3, parser.errors.len());
+        assert_eq!(1, program.statements.len());
+
+        let stmt = &program.statements[0];
+        if let Statement::ExpressionStmt(ExpressionStatement {
+            expression: Expression::IdentifierExpr(expr),
+        }) = stmt
+        {
+            assert_eq!("foobar", expr.value);
+        } else {
+            panic!("Incorrect statement type in test. Expected: ExpressionStatement with Identifier expression. Got {:?}", stmt);
+        }
     }
 }
