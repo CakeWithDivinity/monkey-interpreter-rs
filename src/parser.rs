@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Identifier, Let, Program, Statement, Expression},
+    ast::{Expression, Identifier, Let, Program, Statement},
     lexer::Lexer,
     token::{Token, TokenType},
 };
@@ -8,6 +8,7 @@ struct Parser {
     lexer: Lexer,
     current_token: Token,
     peek_token: Token,
+    errors: Vec<ParseError>,
 }
 
 impl Parser {
@@ -19,6 +20,7 @@ impl Parser {
             lexer,
             current_token,
             peek_token,
+            errors: vec![],
         }
     }
 
@@ -31,8 +33,9 @@ impl Parser {
         let mut program = Program { statements: vec![] };
 
         while self.current_token.token_type != TokenType::EOF {
-            if let Some(statement) = self.parse_statement() {
-                program.statements.push(statement);
+            match self.parse_statement() {
+                Ok(statement) => program.statements.push(statement),
+                Err(err) => self.errors.push(err),
             }
 
             self.next_token();
@@ -41,39 +44,66 @@ impl Parser {
         program
     }
 
-    fn parse_statement(&mut self) -> Option<Statement> {
-        match self.current_token.token_type {
-            TokenType::LET => Some(Statement::LetStmt(self.parse_let_statement()?)),
-            _ => None,
+    fn parse_statement(&mut self) -> Result<Statement, ParseError> {
+        match &self.current_token.token_type {
+            TokenType::LET => Ok(Statement::LetStmt(self.parse_let_statement()?)),
+            token_type => Err(ParseError::UnexpectedToken(UnexpectedTokenError::new(
+                TokenType::LET,
+                token_type,
+            ))),
         }
     }
 
-    fn parse_let_statement(&mut self) -> Option<Let> {
-        if self.peek_token.token_type != TokenType::IDENT {
-            return None;
-        }
-        self.next_token();
-
+    fn parse_let_statement(&mut self) -> Result<Let, ParseError> {
+        self.assert_peek_token(TokenType::IDENT)?;
         let name = Identifier {
             value: self.current_token.literal.to_owned(),
         };
 
-        if self.peek_token.token_type != TokenType::ASSIGN {
-            return None;
-        }
-        self.next_token();
-
+        self.assert_peek_token(TokenType::ASSIGN)?;
         while self.current_token.token_type != TokenType::SEMICOLON {
             self.next_token()
         }
 
         // TODO: evaluate value of let expression
-        return Some(Let {
+        return Ok(Let {
             name,
             value: Expression::IdentifierExpr(Identifier {
-               value: "foo".to_string(), 
+                value: "foo".to_string(),
             }),
         });
+    }
+
+    fn assert_peek_token(&mut self, expected_type: TokenType) -> Result<(), ParseError> {
+        if self.peek_token.token_type == expected_type {
+            self.next_token();
+            return Ok(());
+        }
+
+        Err(ParseError::UnexpectedToken(UnexpectedTokenError::new(
+            TokenType::IDENT,
+            &self.peek_token.token_type,
+        )))
+    }
+}
+
+#[derive(Debug)]
+enum ParseError {
+    UnexpectedToken(UnexpectedTokenError),
+}
+
+#[derive(Debug)]
+struct UnexpectedTokenError {
+    expected: String,
+    actual: String,
+}
+
+impl UnexpectedTokenError {
+    fn new(expected: TokenType, actual: &TokenType) -> Self {
+        Self {
+            expected: format!("{:?}", expected),
+            actual: format!("{:?}", actual),
+        }
     }
 }
 
@@ -98,6 +128,7 @@ let foobar = 696969;
         let program = parser.parse_program();
 
         assert_eq!(3, program.statements.len());
+        assert_eq!(0, parser.errors.len());
 
         let expected = ["x", "y", "foobar"];
 
@@ -112,5 +143,20 @@ let foobar = 696969;
                 ),
             }
         }
+    }
+
+    #[test]
+    fn reports_errors() {
+        let input = "
+let x 5;
+        "
+        .to_string();
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        parser.parse_program();
+
+        assert_eq!(3, parser.errors.len());
     }
 }
