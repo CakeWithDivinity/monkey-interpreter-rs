@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Expression, Identifier, Let, Program, Statement},
+    ast::{Expression, Identifier, Let, Program, Return, Statement},
     lexer::Lexer,
     token::{Token, TokenType},
 };
@@ -47,11 +47,25 @@ impl Parser {
     fn parse_statement(&mut self) -> Result<Statement, ParseError> {
         match &self.current_token.token_type {
             TokenType::LET => Ok(Statement::LetStmt(self.parse_let_statement()?)),
+            TokenType::RETURN => Ok(Statement::ReturnStmt(self.parse_return_statement()?)),
             token_type => Err(ParseError::UnexpectedToken(UnexpectedTokenError::new(
                 TokenType::LET,
                 token_type,
             ))),
         }
+    }
+
+    fn parse_return_statement(&mut self) -> Result<Return, ParseError> {
+        while self.current_token.token_type != TokenType::SEMICOLON {
+            self.next_token();
+        }
+
+        // TODO: evaluate expression
+        Ok(Return {
+            value: Expression::IdentifierExpr(Identifier {
+                value: "foo".to_string(),
+            }),
+        })
     }
 
     fn parse_let_statement(&mut self) -> Result<Let, ParseError> {
@@ -109,12 +123,14 @@ impl UnexpectedTokenError {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_eq;
+
     use crate::{ast::Statement, lexer::Lexer};
 
     use super::Parser;
 
     #[test]
-    fn evaluates_let_statements() {
+    fn parses_let_statements() {
         let input = "
 let x = 5;
 let y = 10;
@@ -132,10 +148,42 @@ let foobar = 696969;
 
         let expected = ["x", "y", "foobar"];
 
-        for (actual, expected) in program.statements.iter().zip(expected.iter()) {
+        for (actual, expected) in program.statements.iter().zip(expected) {
             match actual {
                 Statement::LetStmt(statement) => {
                     assert_eq!(*expected, statement.name.value);
+                }
+                _ => panic!(
+                    "Incorrect statement type in test. Expected: Let, Got: {:?}",
+                    actual
+                ),
+            }
+        }
+    }
+
+    #[test]
+    fn parses_return_statements() {
+        let input = "
+return 5;
+return 10;
+return 69420;
+        "
+        .to_string();
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+
+        assert_eq!(0, parser.errors.len());
+        assert_eq!(3, program.statements.len());
+
+        let expected = ["5", "10", "69420"];
+
+        for (actual, expected) in program.statements.iter().zip(expected) {
+            match actual {
+                Statement::ReturnStmt(statement) => {
+                    // TODO: expression value
                 }
                 _ => panic!(
                     "Incorrect statement type in test. Expected: Let, Got: {:?}",
