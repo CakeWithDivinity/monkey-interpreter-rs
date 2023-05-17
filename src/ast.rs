@@ -42,7 +42,10 @@ pub struct IntegerLiteral {
 }
 
 #[derive(Debug)]
-pub struct Prefix {}
+pub struct Prefix {
+    pub operator: String,
+    pub right: Box<Expression>,
+}
 
 #[derive(Debug)]
 pub struct Infix {
