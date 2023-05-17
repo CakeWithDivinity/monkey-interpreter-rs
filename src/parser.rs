@@ -1,7 +1,10 @@
 use std::any::Any;
 
 use crate::{
-    ast::{Expression, ExpressionStatement, Identifier, Let, Program, Return, Statement},
+    ast::{
+        Expression, ExpressionStatement, Identifier, IntegerLiteral, Let, Program, Return,
+        Statement,
+    },
     lexer::Lexer,
     token::{Token, TokenType},
 };
@@ -106,6 +109,17 @@ impl Parser {
             TokenType::IDENT => Some(Expression::IdentifierExpr(Identifier {
                 value: self.current_token.literal.to_owned(),
             })),
+            TokenType::INT => {
+                let token = &self.current_token.literal;
+
+                match token.parse::<isize>() {
+                    Ok(number) => Some(Expression::IntegerLiteralExpr(IntegerLiteral {
+                        value: number,
+                    })),
+                    // TODO: add error to parser
+                    _ => None,
+                }
+            }
             _ => None,
         }
     }
@@ -248,6 +262,29 @@ return 69420;
             assert_eq!("foobar", expr.value);
         } else {
             panic!("Incorrect statement type in test. Expected: ExpressionStatement with Identifier expression. Got {:?}", stmt);
+        }
+    }
+
+    #[test]
+    fn parses_integer_expression() {
+        let input = "5;".to_string();
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+        assert_eq!(0, parser.errors.len());
+
+        assert_eq!(1, program.statements.len());
+
+        let stmt = &program.statements[0];
+        if let Statement::ExpressionStmt(ExpressionStatement {
+            expression: Expression::IntegerLiteralExpr(expr),
+        }) = stmt
+        {
+            assert_eq!(5, expr.value);
+        } else {
+            panic!("Incorrect statement type in test. Expected: ExpressionStatement with IntegerLiteralExpression. Got {:?}", stmt);
         }
     }
 }

@@ -26,6 +26,7 @@ pub struct ExpressionStatement {
 #[derive(Debug)]
 pub enum Expression {
     IdentifierExpr(Identifier),
+    IntegerLiteralExpr(IntegerLiteral),
     PrefixExpr(Prefix),
     InfixExpr(Infix),
 }
@@ -33,6 +34,11 @@ pub enum Expression {
 #[derive(Debug)]
 pub struct Identifier {
     pub value: String,
+}
+
+#[derive(Debug)]
+pub struct IntegerLiteral {
+    pub value: isize,
 }
 
 #[derive(Debug)]
