@@ -1,7 +1,7 @@
 use crate::{
     ast::{
-        BooleanLiteral, Expression, ExpressionStatement, Identifier, Infix, IntegerLiteral, Let,
-        Prefix, Program, Return, Statement,
+        BlockStatement, BooleanLiteral, Expression, ExpressionStatement, Identifier, If, Infix,
+        IntegerLiteral, Let, Prefix, Program, Return, Statement,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -164,10 +164,6 @@ impl Parser {
 
                 let expr = self.parse_expression(Precedence::Lowest);
 
-                if self.peek_token.token_type != TokenType::RPAREN {
-                    return None;
-                }
-
                 match self.peek_token.token_type {
                     TokenType::RPAREN => {
                         self.next_token();
@@ -176,6 +172,7 @@ impl Parser {
                     _ => None,
                 }
             }
+            TokenType::IF => self.parse_if_expression(),
             _ => None,
         }
     }
@@ -192,6 +189,16 @@ impl Parser {
         )))
     }
 
+    fn assert_peek_token_safely(&mut self, expected_type: TokenType) -> Option<()> {
+        match self.assert_peek_token(expected_type) {
+            Err(err) => {
+                self.errors.push(err);
+                None
+            }
+            _ => Some(()),
+        }
+    }
+
     fn parse_infix_expression(&mut self, left: Expression) -> Option<Expression> {
         let operator = self.current_token.literal.to_owned();
         let precedence = self.current_precedence();
@@ -203,6 +210,52 @@ impl Parser {
             operator,
             right_side: Box::new(self.parse_expression(precedence)?),
         }))
+    }
+
+    fn parse_if_expression(&mut self) -> Option<Expression> {
+        self.assert_peek_token_safely(TokenType::LPAREN)?;
+        self.next_token();
+
+        let condition = self.parse_expression(Precedence::Lowest)?;
+
+        self.assert_peek_token_safely(TokenType::RPAREN)?;
+        self.assert_peek_token_safely(TokenType::LBRACE)?;
+
+        let consequence = self.parse_block_statement();
+
+        let alternative = match self.peek_token.token_type {
+            TokenType::ELSE => {
+                self.next_token();
+                self.assert_peek_token_safely(TokenType::LBRACE)?;
+                Some(self.parse_block_statement())
+            }
+            _ => None,
+        };
+
+        Some(Expression::IfExpr(If {
+            condition: Box::new(condition),
+            consequence,
+            alternative,
+        }))
+    }
+
+    fn parse_block_statement(&mut self) -> BlockStatement {
+        let mut statements: Vec<Statement> = vec![];
+
+        self.next_token();
+
+        while self.current_token.token_type != TokenType::RBRACE
+            && self.current_token.token_type != TokenType::EOF
+        {
+            match self.parse_statement() {
+                Ok(stmt) => statements.push(stmt),
+                Err(err) => self.errors.push(err),
+            };
+
+            self.next_token()
+        }
+
+        BlockStatement { statements }
     }
 
     fn peek_precedence(&self) -> Precedence {
@@ -518,5 +571,87 @@ return 69420;
         } else {
             panic!("Incorrect statement type in test. Expected: ExpressionStatement with InfixExpression. Got {:?}", stmt);
         }
+    }
+
+    #[test]
+    fn parses_if_expression() {
+        let input = "if(x < y) { x }".to_string();
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+        assert_eq!(0, parser.errors.len());
+        assert_eq!(1, program.statements.len());
+
+        let stmt = program.statements.first().unwrap();
+        let Statement::ExpressionStmt(stmt) = &stmt else {
+            panic!("Expected ExpresionStmt. Got {:?}", stmt);
+        };
+
+        let Expression::IfExpr(expr) = &stmt.expression else {
+            panic!("Expected IfExpr. Got {:?}", stmt.expression);
+        };
+        assert_eq!("(x < y)", format!("{}", expr.condition));
+        assert_eq!(1, expr.consequence.statements.len());
+        let consequence = expr.consequence.statements.first().unwrap();
+
+        let Statement::ExpressionStmt(ExpressionStatement {
+            expression: Expression::IdentifierExpr(ident),
+        }) = consequence else {
+            panic!(
+                "Expected ExpressionStatement with IdentifierExpression. Got {:?}",
+                stmt.expression
+            );
+        };
+        assert_eq!("x", ident.value);
+    }
+
+    #[test]
+    fn parses_if_else_expression() {
+        let input = "if(x < y) { x } else { y }".to_string();
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+        assert_eq!(0, parser.errors.len());
+        assert_eq!(1, program.statements.len());
+
+        let stmt = program.statements.first().unwrap();
+        let Statement::ExpressionStmt(stmt) = &stmt else {
+            panic!("Expected ExpresionStmt. Got {:?}", stmt);
+        };
+
+        let Expression::IfExpr(expr) = &stmt.expression else {
+            panic!("Expected IfExpr. Got {:?}", stmt.expression);
+        };
+        assert_eq!("(x < y)", format!("{}", expr.condition));
+        assert_eq!(1, expr.consequence.statements.len());
+        let consequence = expr.consequence.statements.first().unwrap();
+
+        let Statement::ExpressionStmt(ExpressionStatement {
+            expression: Expression::IdentifierExpr(ident),
+        }) = consequence else {
+            panic!(
+                "Expected ExpressionStatement with IdentifierExpression. Got {:?}",
+                stmt.expression
+            );
+        };
+        assert_eq!("x", ident.value);
+
+        let Some(alt) = &expr.alternative else {
+            panic!("No alternative");
+        };
+        assert_eq!(1, alt.statements.len());
+        let alt_stmt = alt.statements.first().unwrap();
+
+        let Statement::ExpressionStmt(ExpressionStatement {
+            expression: Expression::IdentifierExpr(ident),
+        }) = alt_stmt else {
+            panic!(
+                "Expected ExpressionStatement with IdentifierExpression. Got {:?}",
+                stmt.expression
+            );
+        };
+        assert_eq!("y", ident.value);
     }
 }

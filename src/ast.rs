@@ -1,4 +1,4 @@
-use std::{fmt::{format, Display}, os::linux::raw::stat};
+use std::{fmt::Display, ptr::write_volatile};
 
 #[derive(Debug)]
 pub enum Statement {
@@ -30,6 +30,7 @@ pub enum Expression {
     BooleanLiteralExpr(BooleanLiteral),
     PrefixExpr(Prefix),
     InfixExpr(Infix),
+    IfExpr(If),
 }
 
 #[derive(Debug)]
@@ -60,11 +61,33 @@ pub struct Infix {
     pub right_side: Box<Expression>,
 }
 
+#[derive(Debug)]
+pub struct If {
+    pub condition: Box<Expression>,
+    pub consequence: BlockStatement,
+    pub alternative: Option<BlockStatement>,
+}
+
+#[derive(Debug)]
+pub struct BlockStatement {
+    pub statements: Vec<Statement>,
+}
+
 pub struct Program {
     pub statements: Vec<Statement>,
 }
 
 impl Display for Program {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for statement in &self.statements {
+            write!(f, "{}", statement)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Display for BlockStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for statement in &self.statements {
             write!(f, "{}", statement)?;
@@ -102,6 +125,15 @@ impl Display for Expression {
                 "({} {} {})",
                 expr.left_side, expr.operator, expr.right_side
             ),
+            Expression::IfExpr(expr) => {
+                write!(f, "if {} {}", expr.condition, expr.consequence)?;
+
+                if let Some(alt) = &expr.alternative {
+                    write!(f, "else {}", alt)?; 
+                }
+
+                Ok(())
+            },
         }
     }
 }
