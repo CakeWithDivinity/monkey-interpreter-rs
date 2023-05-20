@@ -1,4 +1,4 @@
-use std::fmt::{format, Display};
+use std::{fmt::{format, Display}, os::linux::raw::stat};
 
 #[derive(Debug)]
 pub enum Statement {
@@ -62,6 +62,16 @@ pub struct Infix {
 
 pub struct Program {
     pub statements: Vec<Statement>,
+}
+
+impl Display for Program {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for statement in &self.statements {
+            write!(f, "{}", statement)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl Display for Statement {

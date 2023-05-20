@@ -1,7 +1,7 @@
 use crate::{
     ast::{
-        BooleanLiteral, Expression, ExpressionStatement, Identifier, Infix, IntegerLiteral,
-        Let, Prefix, Program, Return, Statement,
+        BooleanLiteral, Expression, ExpressionStatement, Identifier, Infix, IntegerLiteral, Let,
+        Prefix, Program, Return, Statement,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -247,7 +247,7 @@ mod tests {
     use std::assert_eq;
 
     use crate::{
-        ast::{Expression, ExpressionStatement, Statement, Prefix},
+        ast::{Expression, ExpressionStatement, Prefix, Statement},
         lexer::Lexer,
     };
 
@@ -436,14 +436,36 @@ return 69420;
 
     #[test]
     fn parses_complex_infix_expression() {
-        let input = "3 + 5 * 5 == 3 * 1 + 4 * 5";
+        let test_cases = [
+            ("-a * b", "((-a) * b)"),
+            ("!-a", "(!(-a))"),
+            ("a + b + c", "((a + b) + c)"),
+            ("a + b - c", "((a + b) - c)"),
+            ("a * b * c", "((a * b) * c)"),
+            ("a * b / c", "((a * b) / c)"),
+            ("a + b / c", "(a + (b / c))"),
+            ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
+            ("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)"),
+            ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
+            ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
+            (
+                "3 + 4 * 5 == 3 * 1 + 4 * 5",
+                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            ),
+        ];
 
-        let lexer = Lexer::new(input.to_string());
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
+        for (input, expected) in test_cases {
+            let lexer = Lexer::new(input.to_string());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
 
-        assert_eq!(0, parser.errors.len());
-        assert_eq!(1, program.statements.len());
+            assert_eq!(0, parser.errors.len());
+
+            assert_eq!(
+                expected,
+                format!("{}", program)
+            );
+        }
     }
 
     fn test_integer_literal(expr: &Expression, expected_value: isize) {
@@ -464,6 +486,7 @@ return 69420;
 
         assert_eq!(0, parser.errors.len());
         assert_eq!(1, program.statements.len());
+        assert_eq!("true", format!("{}", program));
 
         let stmt = program.statements.first().unwrap();
 
