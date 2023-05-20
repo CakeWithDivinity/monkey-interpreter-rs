@@ -159,6 +159,23 @@ impl Parser {
                     right: Box::new(self.parse_expression(Precedence::Prefix)?),
                 }))
             }
+            TokenType::LPAREN => {
+                self.next_token();
+
+                let expr = self.parse_expression(Precedence::Lowest);
+
+                if self.peek_token.token_type != TokenType::RPAREN {
+                    return None;
+                }
+
+                match self.peek_token.token_type {
+                    TokenType::RPAREN => {
+                        self.next_token();
+                        expr
+                    }
+                    _ => None,
+                }
+            }
             _ => None,
         }
     }
@@ -452,6 +469,12 @@ return 69420;
                 "3 + 4 * 5 == 3 * 1 + 4 * 5",
                 "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
             ),
+            // grouped expressions:
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            ("(5 + 5) * 2", "((5 + 5) * 2)"),
+            ("2 / (5 + 5)", "(2 / (5 + 5))"),
+            ("-(5 + 5)", "(-(5 + 5))"),
+            ("!(true == true)", "(!(true == true))"),
         ];
 
         for (input, expected) in test_cases {
@@ -461,10 +484,7 @@ return 69420;
 
             assert_eq!(0, parser.errors.len());
 
-            assert_eq!(
-                expected,
-                format!("{}", program)
-            );
+            assert_eq!(expected, format!("{}", program));
         }
     }
 
