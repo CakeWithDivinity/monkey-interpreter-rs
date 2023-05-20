@@ -127,51 +127,10 @@ impl Parser {
             TokenType::IDENT => Some(Expression::IdentifierExpr(Identifier {
                 value: self.current_token.literal.to_owned(),
             })),
-            TokenType::INT => {
-                let token = &self.current_token.literal;
-
-                match token.parse::<isize>() {
-                    Ok(number) => Some(Expression::IntegerLiteralExpr(IntegerLiteral {
-                        value: number,
-                    })),
-                    // TODO: add error to parser
-                    _ => None,
-                }
-            }
-            TokenType::TRUE | TokenType::FALSE => {
-                let val = match self.current_token.token_type {
-                    TokenType::TRUE => true,
-                    TokenType::FALSE => false,
-                    _ => return None,
-                };
-
-                Some(Expression::BooleanLiteralExpr(BooleanLiteral {
-                    value: val,
-                }))
-            }
-            TokenType::BANG | TokenType::MINUS => {
-                let operator = self.current_token.literal.to_string();
-
-                self.next_token();
-
-                Some(Expression::PrefixExpr(Prefix {
-                    operator,
-                    right: Box::new(self.parse_expression(Precedence::Prefix)?),
-                }))
-            }
-            TokenType::LPAREN => {
-                self.next_token();
-
-                let expr = self.parse_expression(Precedence::Lowest);
-
-                match self.peek_token.token_type {
-                    TokenType::RPAREN => {
-                        self.next_token();
-                        expr
-                    }
-                    _ => None,
-                }
-            }
+            TokenType::INT => self.parse_int_literal_expression(),
+            TokenType::TRUE | TokenType::FALSE => self.parse_boolean_literal_expression(),
+            TokenType::BANG | TokenType::MINUS => self.parse_operator_prefix_expression(),
+            TokenType::LPAREN => self.parse_grouped_expression(),
             TokenType::IF => self.parse_if_expression(),
             _ => None,
         }
@@ -197,6 +156,55 @@ impl Parser {
             }
             _ => Some(()),
         }
+    }
+
+    fn parse_grouped_expression(&mut self) -> Option<Expression> {
+        self.next_token();
+
+        let expr = self.parse_expression(Precedence::Lowest);
+
+        match self.peek_token.token_type {
+            TokenType::RPAREN => {
+                self.next_token();
+                expr
+            }
+            _ => None,
+        }
+    }
+
+    fn parse_operator_prefix_expression(&mut self) -> Option<Expression> {
+        let operator = self.current_token.literal.to_string();
+
+        self.next_token();
+
+        Some(Expression::PrefixExpr(Prefix {
+            operator,
+            right: Box::new(self.parse_expression(Precedence::Prefix)?),
+        }))
+    }
+
+    fn parse_int_literal_expression(&mut self) -> Option<Expression> {
+        let token = &self.current_token.literal;
+
+        match token.parse::<isize>() {
+            Ok(number) => Some(Expression::IntegerLiteralExpr(IntegerLiteral {
+                value: number,
+            })),
+            // TODO: add error to parser
+            _ => None,
+        }
+    }
+
+    fn parse_boolean_literal_expression(&mut self) -> Option<Expression> {
+        let val = match self.current_token.token_type {
+            TokenType::TRUE => true,
+            TokenType::FALSE => false,
+            _ => return None,
+        };
+
+        Some(Expression::BooleanLiteralExpr(BooleanLiteral {
+            value: val,
+        }))
     }
 
     fn parse_infix_expression(&mut self, left: Expression) -> Option<Expression> {
