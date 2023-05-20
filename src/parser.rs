@@ -247,7 +247,7 @@ mod tests {
     use std::assert_eq;
 
     use crate::{
-        ast::{Expression, ExpressionStatement, Statement},
+        ast::{Expression, ExpressionStatement, Statement, Prefix},
         lexer::Lexer,
     };
 

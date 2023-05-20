@@ -1,4 +1,4 @@
-use std::fmt::{Display, Pointer};
+use std::fmt::{format, Display};
 
 #[derive(Debug)]
 pub enum Statement {
@@ -62,4 +62,55 @@ pub struct Infix {
 
 pub struct Program {
     pub statements: Vec<Statement>,
+}
+
+impl Display for Statement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Statement::LetStmt(stmt) => write!(f, "let {} = {};", stmt.name, stmt.value),
+            Statement::ReturnStmt(stmt) => write!(f, "return {};", stmt.value),
+            Statement::ExpressionStmt(stmt) => write!(f, "{}", stmt.expression),
+        }
+    }
+}
+
+impl Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+impl Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expression::IdentifierExpr(expr) => write!(f, "{}", expr),
+            Expression::IntegerLiteralExpr(expr) => write!(f, "{}", expr.value),
+            Expression::BooleanLiteralExpr(expr) => write!(f, "{}", expr.value),
+            Expression::PrefixExpr(expr) => write!(f, "({}{})", expr.operator, expr.right),
+            Expression::InfixExpr(expr) => write!(
+                f,
+                "({} {} {})",
+                expr.left_side, expr.operator, expr.right_side
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Expression, Identifier, Let, Statement};
+
+    #[test]
+    fn displays_statement() {
+        let statement = Statement::LetStmt(Let {
+            name: Identifier {
+                value: "myVar".to_string(),
+            },
+            value: Expression::IdentifierExpr(Identifier {
+                value: "anotherVar".to_string(),
+            }),
+        });
+
+        assert_eq!("let myVar = anotherVar;", format!("{}", statement));
+    }
 }
