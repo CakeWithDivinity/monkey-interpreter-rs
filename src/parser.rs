@@ -1,7 +1,7 @@
 use crate::{
     ast::{
-        Expression, ExpressionStatement, Identifier, Infix, IntegerLiteral, Let, Prefix, Program,
-        Return, Statement,
+        BooleanLiteral, Expression, ExpressionStatement, Identifier, Infix, IntegerLiteral,
+        Let, Prefix, Program, Return, Statement,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -137,6 +137,17 @@ impl Parser {
                     // TODO: add error to parser
                     _ => None,
                 }
+            }
+            TokenType::TRUE | TokenType::FALSE => {
+                let val = match self.current_token.token_type {
+                    TokenType::TRUE => true,
+                    TokenType::FALSE => false,
+                    _ => return None,
+                };
+
+                Some(Expression::BooleanLiteralExpr(BooleanLiteral {
+                    value: val,
+                }))
             }
             TokenType::BANG | TokenType::MINUS => {
                 let operator = self.current_token.literal.to_string();
@@ -440,6 +451,29 @@ return 69420;
             assert_eq!(expected_value, expr.value);
         } else {
             panic!("Expected IntegerLiteralExpression. Got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn parses_boolean_expression() {
+        let input = "true";
+
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        assert_eq!(0, parser.errors.len());
+        assert_eq!(1, program.statements.len());
+
+        let stmt = program.statements.first().unwrap();
+
+        if let Statement::ExpressionStmt(ExpressionStatement {
+            expression: Expression::BooleanLiteralExpr(expr),
+        }) = stmt
+        {
+            assert_eq!(true, expr.value);
+        } else {
+            panic!("Incorrect statement type in test. Expected: ExpressionStatement with InfixExpression. Got {:?}", stmt);
         }
     }
 }
