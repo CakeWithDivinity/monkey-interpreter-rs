@@ -423,6 +423,18 @@ return 69420;
         }
     }
 
+    #[test]
+    fn parses_complex_infix_expression() {
+        let input = "3 + 5 * 5 == 3 * 1 + 4 * 5";
+
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        assert_eq!(0, parser.errors.len());
+        assert_eq!(1, program.statements.len());
+    }
+
     fn test_integer_literal(expr: &Expression, expected_value: isize) {
         if let Expression::IntegerLiteralExpr(expr) = expr {
             assert_eq!(expected_value, expr.value);
