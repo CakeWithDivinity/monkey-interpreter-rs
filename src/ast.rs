@@ -49,7 +49,9 @@ pub struct Prefix {
 
 #[derive(Debug)]
 pub struct Infix {
-    left_side: Box<Expression>,
+    pub left_side: Box<Expression>,
+    pub operator: String,
+    pub right_side: Box<Expression>,
 }
 
 pub struct Program {

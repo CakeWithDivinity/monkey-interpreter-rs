@@ -36,6 +36,22 @@ pub enum TokenType {
     NEQ,
 }
 
+impl TokenType {
+    pub fn is_infix_parseable(&self) -> bool {
+        match self {
+            Self::PLUS
+            | Self::MINUS
+            | TokenType::SLASH
+            | Self::ASTERISK
+            | Self::EQ
+            | Self::NEQ
+            | Self::LT
+            | Self::GT => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Token {
     pub token_type: TokenType,
