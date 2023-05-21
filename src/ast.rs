@@ -1,4 +1,4 @@
-use std::{fmt::Display, ptr::write_volatile};
+use std::fmt::Display;
 
 #[derive(Debug)]
 pub enum Statement {
@@ -32,6 +32,7 @@ pub enum Expression {
     InfixExpr(Infix),
     IfExpr(If),
     FunctionExpr(Function),
+    CallExpr(Call),
 }
 
 #[derive(Debug)]
@@ -78,6 +79,12 @@ pub struct BlockStatement {
 pub struct Function {
     pub parameters: Vec<Identifier>,
     pub body: BlockStatement,
+}
+
+#[derive(Debug)]
+pub struct Call {
+    pub function: Box<Expression>,
+    pub arguments: Vec<Expression>,
 }
 
 pub struct Program {
@@ -156,7 +163,22 @@ impl Display for Expression {
 
                 write!(f, ") {}", expr.body)?;
                 Ok(())
-            }
+            },
+            Expression::CallExpr(expr) => {
+                write!(f, "{} (", expr.function)?;
+
+                let mut args = expr.arguments.iter().peekable();
+
+                while let Some(arg) = args.next() {
+                    if args.peek().is_some() {
+                        write!(f, "{}, ", arg)?;
+                    } else {
+                        write!(f, "{})", arg)?;
+                    }
+                }
+
+                Ok(())
+            },
         }
     }
 }

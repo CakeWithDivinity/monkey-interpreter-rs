@@ -1,7 +1,7 @@
 use crate::{
     ast::{
-        BlockStatement, BooleanLiteral, Expression, ExpressionStatement, Function, Identifier, If,
-        Infix, IntegerLiteral, Let, Prefix, Program, Return, Statement,
+        BlockStatement, BooleanLiteral, Call, Expression, ExpressionStatement, Function,
+        Identifier, If, Infix, IntegerLiteral, Let, Prefix, Program, Return, Statement,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -113,7 +113,7 @@ impl Parser {
             if !self.peek_token.token_type.is_infix_parseable() {
                 return Some(left);
             }
-
+        
             self.next_token();
 
             left = self.parse_infix_expression(left)?;
@@ -176,7 +176,6 @@ impl Parser {
 
     fn parse_function_parameters(&mut self) -> Option<Vec<Identifier>> {
         let mut identifiers = vec![];
-
 
         if self.peek_token.token_type == TokenType::RPAREN {
             self.next_token();
@@ -253,6 +252,12 @@ impl Parser {
     }
 
     fn parse_infix_expression(&mut self, left: Expression) -> Option<Expression> {
+        // TODO: make this call cleaner
+        if self.current_token.token_type == TokenType::LPAREN {
+            return self.parse_call_expression(left);
+        }
+
+
         let operator = self.current_token.literal.to_owned();
         let precedence = self.current_precedence();
 
@@ -263,6 +268,35 @@ impl Parser {
             operator,
             right_side: Box::new(self.parse_expression(precedence)?),
         }))
+    }
+
+    fn parse_call_expression(&mut self, function: Expression) -> Option<Expression> {
+        Some(Expression::CallExpr(Call {
+            function: Box::new(function),
+            arguments: self.parse_call_arguments()?,
+        }))
+    }
+
+    fn parse_call_arguments(&mut self) -> Option<Vec<Expression>> {
+        let mut args = vec![];
+
+        if self.peek_token.token_type == TokenType::RPAREN {
+            self.next_token();
+            return Some(args);
+        }
+
+        self.next_token();
+        args.push(self.parse_expression(Precedence::Lowest)?);
+
+        while self.peek_token.token_type == TokenType::COMMA {
+            self.next_token();
+            self.next_token();
+            args.push(self.parse_expression(Precedence::Lowest)?);
+        }
+
+        self.assert_peek_token_safely(TokenType::RPAREN)?;
+
+        Some(args)
     }
 
     fn parse_if_expression(&mut self) -> Option<Expression> {
@@ -338,6 +372,7 @@ impl From<&TokenType> for Precedence {
             TokenType::LT | TokenType::GT => Self::LessGreater,
             TokenType::PLUS | TokenType::MINUS => Self::Sum,
             TokenType::SLASH | TokenType::ASTERISK => Self::Product,
+            TokenType::LPAREN => Self::Call,
             _ => Self::Lowest,
         }
     }
@@ -770,5 +805,34 @@ return 69420;
                 assert_eq!(*param, func.parameters[index].value);
             }
         }
+    }
+
+    #[test]
+    fn parses_call_expression() {
+        let input = "add(1, 2 * 3, 4 + 5);".to_string();
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        assert_eq!(0, parser.errors.len());
+        assert_eq!(1, program.statements.len());
+
+        let stmt = program.statements.first().unwrap();
+
+        let Statement::ExpressionStmt(stmt) = stmt else {
+                panic!("Expected ExpressionStmt. Got {:?}", stmt);
+        };
+
+        let Expression::CallExpr(call) = &stmt.expression else {
+                panic!("Expected CallExpr. Got {:?}", stmt.expression);
+        };
+
+        assert_eq!("add", format!("{}", call.function));
+
+        assert_eq!(3, call.arguments.len());
+        assert_eq!("1", format!("{}", call.arguments[0]));
+        assert_eq!("(2 * 3)", format!("{}", call.arguments[1]));
+        assert_eq!("(4 + 5)", format!("{}", call.arguments[2]));
     }
 }

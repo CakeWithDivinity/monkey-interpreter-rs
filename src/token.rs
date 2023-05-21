@@ -46,6 +46,7 @@ impl TokenType {
             | Self::EQ
             | Self::NEQ
             | Self::LT
+            | Self::LPAREN
             | Self::GT => true,
             _ => false,
         }
