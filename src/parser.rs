@@ -62,16 +62,18 @@ impl Parser {
     }
 
     fn parse_return_statement(&mut self) -> Result<Return, ParseError> {
-        while self.current_token.token_type != TokenType::SEMICOLON {
+        self.next_token();
+
+        let return_val = match self.parse_expression(Precedence::Lowest) {
+            Some(expr) => expr,
+            _ => return Err(ParseError::ParseExpressionError),
+        };
+
+        if self.peek_token.token_type == TokenType::SEMICOLON {
             self.next_token();
         }
 
-        // TODO: evaluate expression
-        Ok(Return {
-            value: Expression::IdentifierExpr(Identifier {
-                value: "foo".to_string(),
-            }),
-        })
+        Ok(Return { value: return_val })
     }
 
     fn parse_let_statement(&mut self) -> Result<Let, ParseError> {
@@ -81,16 +83,22 @@ impl Parser {
         };
 
         self.assert_peek_token(TokenType::ASSIGN)?;
-        while self.current_token.token_type != TokenType::SEMICOLON {
-            self.next_token()
+
+        self.next_token();
+
+        let value = match self.parse_expression(Precedence::Lowest) {
+            Some(expr) => expr,
+            _ => return Err(ParseError::ParseExpressionError),
+        };
+
+        if self.peek_token.token_type == TokenType::SEMICOLON {
+            self.next_token();
         }
 
         // TODO: evaluate value of let expression
         return Ok(Let {
             name,
-            value: Expression::IdentifierExpr(Identifier {
-                value: "foo".to_string(),
-            }),
+            value,
         });
     }
 
@@ -113,7 +121,7 @@ impl Parser {
             if !self.peek_token.token_type.is_infix_parseable() {
                 return Some(left);
             }
-        
+
             self.next_token();
 
             left = self.parse_infix_expression(left)?;
@@ -256,7 +264,6 @@ impl Parser {
         if self.current_token.token_type == TokenType::LPAREN {
             return self.parse_call_expression(left);
         }
-
 
         let operator = self.current_token.literal.to_owned();
         let precedence = self.current_precedence();
@@ -402,7 +409,7 @@ impl UnexpectedTokenError {
 
 #[cfg(test)]
 mod tests {
-    use std::assert_eq;
+    use std::{assert_eq, fmt::format};
 
     use crate::{
         ast::{Expression, ExpressionStatement, Prefix, Statement},
@@ -415,8 +422,8 @@ mod tests {
     fn parses_let_statements() {
         let input = "
 let x = 5;
-let y = 10;
-let foobar = 696969;
+let y = true;
+let foobar = y;
         "
         .to_string();
 
@@ -428,12 +435,13 @@ let foobar = 696969;
         assert_eq!(3, program.statements.len());
         assert_eq!(0, parser.errors.len());
 
-        let expected = ["x", "y", "foobar"];
+        let expected = [("x", "5"), ("y", "true"), ("foobar", "y")];
 
-        for (actual, expected) in program.statements.iter().zip(expected) {
+        for (actual, (expected_ident, expected_val)) in program.statements.iter().zip(expected) {
             match actual {
                 Statement::LetStmt(statement) => {
-                    assert_eq!(*expected, statement.name.value);
+                    assert_eq!(*expected_ident, statement.name.value);
+                    assert_eq!(expected_val, format!("{}", statement.value));
                 }
                 _ => panic!(
                     "Incorrect statement type in test. Expected: Let, Got: {:?}",
@@ -447,8 +455,8 @@ let foobar = 696969;
     fn parses_return_statements() {
         let input = "
 return 5;
-return 10;
-return 69420;
+return true;
+return y;
         "
         .to_string();
 
@@ -460,12 +468,12 @@ return 69420;
         assert_eq!(0, parser.errors.len());
         assert_eq!(3, program.statements.len());
 
-        let expected = ["5", "10", "69420"];
+        let expected = ["5", "true", "y"];
 
         for (actual, expected) in program.statements.iter().zip(expected) {
             match actual {
                 Statement::ReturnStmt(statement) => {
-                    // TODO: expression value
+                    assert_eq!(expected, format!("{}", statement.value))
                 }
                 _ => panic!(
                     "Incorrect statement type in test. Expected: Let, Got: {:?}",
