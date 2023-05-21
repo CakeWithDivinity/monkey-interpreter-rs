@@ -1,7 +1,7 @@
 use crate::{
     ast::{
-        BlockStatement, BooleanLiteral, Expression, ExpressionStatement, Identifier, If, Infix,
-        IntegerLiteral, Let, Prefix, Program, Return, Statement,
+        BlockStatement, BooleanLiteral, Expression, ExpressionStatement, Function, Identifier, If,
+        Infix, IntegerLiteral, Let, Prefix, Program, Return, Statement,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -132,6 +132,7 @@ impl Parser {
             TokenType::BANG | TokenType::MINUS => self.parse_operator_prefix_expression(),
             TokenType::LPAREN => self.parse_grouped_expression(),
             TokenType::IF => self.parse_if_expression(),
+            TokenType::FUNCTION => self.parse_function_expression(),
             _ => None,
         }
     }
@@ -156,6 +157,50 @@ impl Parser {
             }
             _ => Some(()),
         }
+    }
+
+    fn parse_function_expression(&mut self) -> Option<Expression> {
+        self.assert_peek_token_safely(TokenType::LPAREN)?;
+
+        let params = self.parse_function_parameters()?;
+
+        self.assert_peek_token_safely(TokenType::LBRACE)?;
+
+        let body = self.parse_block_statement();
+
+        Some(Expression::FunctionExpr(Function {
+            body,
+            parameters: params,
+        }))
+    }
+
+    fn parse_function_parameters(&mut self) -> Option<Vec<Identifier>> {
+        let mut identifiers = vec![];
+
+
+        if self.peek_token.token_type == TokenType::RPAREN {
+            self.next_token();
+            return Some(identifiers);
+        }
+
+        self.next_token();
+
+        identifiers.push(Identifier {
+            value: self.current_token.literal.to_owned(),
+        });
+
+        while self.peek_token.token_type == TokenType::COMMA {
+            self.next_token();
+            self.next_token();
+
+            identifiers.push(Identifier {
+                value: self.current_token.literal.to_owned(),
+            });
+        }
+
+        self.assert_peek_token_safely(TokenType::RPAREN)?;
+
+        Some(identifiers)
     }
 
     fn parse_grouped_expression(&mut self) -> Option<Expression> {
@@ -661,5 +706,69 @@ return 69420;
             );
         };
         assert_eq!("y", ident.value);
+    }
+
+    #[test]
+    fn parses_function_literal() {
+        let input = "fn(x, y) { x + y; }".to_string();
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+        assert_eq!(0, parser.errors.len());
+        assert_eq!(1, program.statements.len());
+
+        let stmt = program.statements.first().unwrap();
+
+        let Statement::ExpressionStmt(expr) = stmt else {
+            panic!("Expected ExpressionStmt. Got {:?}", stmt);
+        };
+
+        let Expression::FunctionExpr(expr) = &expr.expression else {
+            panic!("Expected FunctionExpr. Got {:?}", expr);
+        };
+
+        assert_eq!(2, expr.parameters.len());
+        assert_eq!("x", expr.parameters[0].value);
+        assert_eq!("y", expr.parameters[1].value);
+
+        assert_eq!(1, expr.body.statements.len());
+
+        let stmt = expr.body.statements.first().unwrap();
+        assert_eq!("(x + y)", format!("{}", stmt));
+    }
+
+    #[test]
+    fn parses_function_parameters() {
+        let test_cases = [
+            ("fn () {};", vec![]),
+            ("fn (x) {};", vec!["x"]),
+            ("fn (x, y, z) {};", vec!["x", "y", "z"]),
+        ];
+
+        for (input, expected) in test_cases {
+            let lexer = Lexer::new(input.to_string());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+
+            assert_eq!(0, parser.errors.len());
+
+            let stmt = program.statements.first().unwrap();
+
+            let Statement::ExpressionStmt(stmt) = stmt else {
+                panic!("Expected ExpressionStmt. Got {:?}", stmt);
+            };
+
+            let Expression::FunctionExpr(func) = &stmt.expression else {
+                panic!("Expected FunctionExpr. Got {:?}", stmt.expression);
+            };
+
+            assert_eq!(expected.len(), func.parameters.len());
+
+            for (index, param) in expected.iter().enumerate() {
+                assert_eq!(*param, func.parameters[index].value);
+            }
+        }
     }
 }

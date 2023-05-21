@@ -31,6 +31,7 @@ pub enum Expression {
     PrefixExpr(Prefix),
     InfixExpr(Infix),
     IfExpr(If),
+    FunctionExpr(Function),
 }
 
 #[derive(Debug)]
@@ -71,6 +72,12 @@ pub struct If {
 #[derive(Debug)]
 pub struct BlockStatement {
     pub statements: Vec<Statement>,
+}
+
+#[derive(Debug)]
+pub struct Function {
+    pub parameters: Vec<Identifier>,
+    pub body: BlockStatement,
 }
 
 pub struct Program {
@@ -129,11 +136,27 @@ impl Display for Expression {
                 write!(f, "if {} {}", expr.condition, expr.consequence)?;
 
                 if let Some(alt) = &expr.alternative {
-                    write!(f, "else {}", alt)?; 
+                    write!(f, "else {}", alt)?;
                 }
 
                 Ok(())
-            },
+            }
+            Expression::FunctionExpr(expr) => {
+                write!(f, "fn (")?;
+
+                let mut params = expr.parameters.iter().peekable();
+
+                while let Some(param) = params.next() {
+                    if params.peek().is_some() {
+                        write!(f, "{}, ", param)?;
+                    } else {
+                        write!(f, "{}", param)?;
+                    }
+                }
+
+                write!(f, ") {}", expr.body)?;
+                Ok(())
+            }
         }
     }
 }
