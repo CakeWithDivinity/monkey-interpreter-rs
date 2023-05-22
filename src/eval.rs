@@ -10,7 +10,7 @@ pub fn eval(node: Node) -> Option<Object> {
         Node::Expr(Expression::PrefixExpr(expr)) => {
             let right = eval(Node::Expr(*expr.right))?;
             eval_prefix_expression(expr.operator, right)
-        },
+        }
         Node::Program(program) => eval_statements(program.statements),
         Node::Stmt(Statement::ExpressionStmt(stmt)) => eval(Node::Expr(stmt.expression)),
         _ => todo!(),
@@ -30,6 +30,7 @@ fn eval_statements(stmts: Vec<Statement>) -> Option<Object> {
 fn eval_prefix_expression(operator: String, right: Object) -> Option<Object> {
     match operator.as_str() {
         "!" => Some(eval_bang_operator(right)),
+        "-" => eval_minus_prefix_operator(right),
         _ => None,
     }
 }
@@ -42,6 +43,14 @@ fn eval_bang_operator(right: Object) -> Object {
     }
 }
 
+fn eval_minus_prefix_operator(right: Object) -> Option<Object> {
+    let Object::Integer(int) = right else {
+        return None;
+    };
+
+    Some(Object::Integer(-int))
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{ast::Node, lexer::Lexer, object::Object, parser::Parser};
@@ -50,7 +59,7 @@ mod tests {
 
     #[test]
     fn evaluates_integer_expr() {
-        let test_cases = [("5", 5), ("10", 10)];
+        let test_cases = [("5", 5), ("10", 10), ("-5", -5), ("-10", -10)];
 
         for test in test_cases {
             let evaluated = test_eval(test.0);
