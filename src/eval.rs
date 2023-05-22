@@ -3,7 +3,7 @@ use crate::{
     object::Object,
 };
 
-fn eval(node: Node) -> Option<Object> {
+pub fn eval(node: Node) -> Option<Object> {
     match node {
         Node::Expr(Expression::IntegerLiteralExpr(expr)) =>
             Some(Object::Integer(expr.value)),

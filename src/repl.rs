@@ -1,8 +1,9 @@
-use std::io::{self, Write};
+use std::{io::{self, Write}, println};
 
 use crate::{
     lexer::Lexer,
-    parser::{ParseError, Parser},
+    parser::{ParseError, Parser}, eval::eval,
+    ast::Node,
 };
 
 pub fn run_repl() -> io::Result<()> {
@@ -23,7 +24,12 @@ pub fn run_repl() -> io::Result<()> {
             continue;
         }
 
-        println!("{}", program);
+        let output = eval(Node::Program(program));
+
+        match output {
+            Some(output) => println!("{}", output),
+            None => println!("**No output**"),
+        };
     }
 }
 
