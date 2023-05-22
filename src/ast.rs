@@ -5,6 +5,7 @@ pub enum Statement {
     LetStmt(Let),
     ReturnStmt(Return),
     ExpressionStmt(ExpressionStatement),
+    BlockStmt(BlockStatement),
 }
 
 #[derive(Debug)]
@@ -123,6 +124,7 @@ impl Display for Statement {
             Statement::LetStmt(stmt) => write!(f, "let {} = {};", stmt.name, stmt.value),
             Statement::ReturnStmt(stmt) => write!(f, "return {};", stmt.value),
             Statement::ExpressionStmt(stmt) => write!(f, "{}", stmt.expression),
+            Statement::BlockStmt(stmt) => write!(f, "{}", stmt),
         }
     }
 }

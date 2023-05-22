@@ -7,6 +7,16 @@ pub enum Object {
     Null,
 }
 
+impl Object {
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Self::Null | Self::Boolean(false) => false,
+            Self::Boolean(true) => true,
+            Self::Integer(_) => true,
+        }
+    }
+}
+
 impl Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Expression, Node, Statement},
+    ast::{Expression, Node, Statement, If},
     object::Object,
 };
 
@@ -16,9 +16,11 @@ pub fn eval(node: Node) -> Option<Object> {
             let right = eval(Node::Expr(*expr.right_side))?;
 
             eval_infix_expression(expr.operator, left, right)
-        }
+        },
+        Node::Expr(Expression::IfExpr(expr)) => eval_if_expression(expr),
         Node::Program(program) => eval_statements(program.statements),
         Node::Stmt(Statement::ExpressionStmt(stmt)) => eval(Node::Expr(stmt.expression)),
+        Node::Stmt(Statement::BlockStmt(stmt)) => eval_statements(stmt.statements),
         _ => todo!(),
     }
 }
@@ -41,17 +43,29 @@ fn eval_prefix_expression(operator: String, right: Object) -> Option<Object> {
     }
 }
 
+fn eval_if_expression(expr: If) -> Option<Object> {
+    let condition = eval(Node::Expr(*expr.condition))?;
+
+    if condition.is_truthy() {
+       eval(Node::Stmt(Statement::BlockStmt(expr.consequence)))
+    } else if expr.alternative.is_some() {
+        eval(Node::Stmt(Statement::BlockStmt(expr.alternative.unwrap())))
+    } else {
+       Some(Object::Null)
+    }
+}
+
 fn eval_infix_expression(operator: String, left: Object, right: Object) -> Option<Object> {
     match (left, right, operator.as_str()) {
         (Object::Integer(left), Object::Integer(right), operator) => {
             eval_integer_infix_expression(operator, left, right)
-        },
+        }
         (Object::Boolean(left), Object::Boolean(right), "==") => {
             Some(Object::Boolean(left == right))
-        },
+        }
         (Object::Boolean(left), Object::Boolean(right), "!=") => {
             Some(Object::Boolean(left != right))
-        },
+        }
         _ => None,
     }
 }
@@ -118,14 +132,6 @@ mod tests {
         }
     }
 
-    fn test_integer_obj(obj: Object, expected: isize) {
-        let Object::Integer(int) = obj else {
-            panic!("Expected Integer Object. Got {:?}", obj);
-        };
-
-        assert_eq!(expected, int);
-    }
-
     #[test]
     fn evaluates_boolean_expression() {
         let test_cases = [("true", true), ("false", false)];
@@ -170,6 +176,46 @@ mod tests {
         }
     }
 
+    #[test]
+    fn evaluates_if_expressions() {
+        let test_cases = [
+            ("if (true) { 10 }", Some(10)),
+            ("if (false) { 10 }", None),
+            ("if (1) { 10 }", Some(10)),
+            ("if (1 < 2) { 10 }", Some(10)),
+            ("if (1 > 2) { 10 }", None),
+            ("if (1 > 2) { 10 } else { 20 }", Some(20)),
+            ("if (1 < 2) { 10 } else { 20 }", Some(10)),
+        ];
+
+        for test in test_cases {
+            let evaluated = test_eval(test.0);
+
+            match test.1 {
+                Some(int) => {
+                    test_integer_obj(evaluated, int);
+                }
+                None => {
+                    test_null_obj(evaluated);
+                }
+            }
+        }
+    }
+
+    fn test_null_obj(obj: Object) {
+        let Object::Null = obj else {
+            panic!("Expected null Object. Got {:?}", obj);
+        };
+    }
+
+    fn test_integer_obj(obj: Object, expected: isize) {
+        let Object::Integer(int) = obj else {
+            panic!("Expected Integer Object. Got {:?}", obj);
+        };
+
+        assert_eq!(expected, int);
+    }
+
     fn test_boolean_obj(obj: Object, expected: bool) {
         let Object::Boolean(bool) = obj else {
             panic!("Expected Boolean Object. Got {:?}", obj);
@@ -183,6 +229,6 @@ mod tests {
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
 
-        eval(Node::Program(program)).expect("Input created no output")
+        eval(Node::Program(program)).expect("No output")
     }
 }
