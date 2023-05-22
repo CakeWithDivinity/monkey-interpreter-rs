@@ -5,14 +5,14 @@ use crate::{
 
 pub fn eval(node: Node) -> Option<Object> {
     match node {
-        Node::Expr(Expression::IntegerLiteralExpr(expr)) =>
-            Some(Object::Integer(expr.value)),
-        Node::Expr(Expression::BooleanLiteralExpr(expr)) =>
-            Some(Object::Boolean(expr.value)),
-        Node::Program(program) =>
-            eval_statements(program.statements),
-        Node::Stmt(Statement::ExpressionStmt(stmt)) =>
-            eval(Node::Expr(stmt.expression)),
+        Node::Expr(Expression::IntegerLiteralExpr(expr)) => Some(Object::Integer(expr.value)),
+        Node::Expr(Expression::BooleanLiteralExpr(expr)) => Some(Object::Boolean(expr.value)),
+        Node::Expr(Expression::PrefixExpr(expr)) => {
+            let right = eval(Node::Expr(*expr.right))?;
+            eval_prefix_expression(expr.operator, right)
+        },
+        Node::Program(program) => eval_statements(program.statements),
+        Node::Stmt(Statement::ExpressionStmt(stmt)) => eval(Node::Expr(stmt.expression)),
         _ => todo!(),
     }
 }
@@ -25,6 +25,21 @@ fn eval_statements(stmts: Vec<Statement>) -> Option<Object> {
     }
 
     result
+}
+
+fn eval_prefix_expression(operator: String, right: Object) -> Option<Object> {
+    match operator.as_str() {
+        "!" => Some(eval_bang_operator(right)),
+        _ => None,
+    }
+}
+
+fn eval_bang_operator(right: Object) -> Object {
+    match right {
+        Object::Boolean(bool) => Object::Boolean(!bool),
+        Object::Null => Object::Boolean(true),
+        _ => Object::Boolean(false),
+    }
 }
 
 #[cfg(test)]
@@ -61,6 +76,23 @@ mod tests {
         }
     }
 
+    #[test]
+    fn evaluates_bang_operator() {
+        let test_cases = [
+            ("!true", false),
+            ("!false", true),
+            ("!5", false),
+            ("!!true", true),
+            ("!!false", false),
+            ("!!5", true),
+        ];
+
+        for test in test_cases {
+            let evaluated = test_eval(test.0);
+            test_boolean_obj(evaluated, test.1);
+        }
+    }
+
     fn test_boolean_obj(obj: Object, expected: bool) {
         let Object::Boolean(bool) = obj else {
             panic!("Expected Boolean Object. Got {:?}", obj);
@@ -76,5 +108,4 @@ mod tests {
 
         eval(Node::Program(program)).expect("Input created no output")
     }
-
 }
