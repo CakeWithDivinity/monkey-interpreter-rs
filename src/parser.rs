@@ -97,7 +97,6 @@ impl Parser {
             self.next_token();
         }
 
-        // TODO: evaluate value of let expression
         return Ok(Let { name, value });
     }
 

@@ -91,6 +91,12 @@ pub struct Program {
     pub statements: Vec<Statement>,
 }
 
+pub enum Node {
+    Stmt(Statement),
+    Expr(Expression),
+    Program(Program),
+}
+
 impl Display for Program {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for statement in &self.statements {
