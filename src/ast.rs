@@ -163,7 +163,7 @@ impl Display for Expression {
 
                 write!(f, ") {}", expr.body)?;
                 Ok(())
-            },
+            }
             Expression::CallExpr(expr) => {
                 write!(f, "{} (", expr.function)?;
 
@@ -178,7 +178,7 @@ impl Display for Expression {
                 }
 
                 Ok(())
-            },
+            }
         }
     }
 }

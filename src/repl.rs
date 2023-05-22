@@ -1,6 +1,9 @@
 use std::io::{self, Write};
 
-use crate::{lexer::Lexer, token::TokenType};
+use crate::{
+    lexer::Lexer,
+    parser::{ParseError, Parser},
+};
 
 pub fn run_repl() -> io::Result<()> {
     loop {
@@ -11,14 +14,22 @@ pub fn run_repl() -> io::Result<()> {
 
         io::stdin().read_line(&mut input)?;
 
-        let mut lexer = Lexer::new(input);
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
 
-        let mut token = lexer.next_token();
-
-        while token.token_type != TokenType::EOF {
-            println!("{:#?}", token);
-            token = lexer.next_token();
+        if parser.errors.len() > 0 {
+            print_parser_errors(&parser.errors);
+            continue;
         }
-        println!();
+
+        println!("{}", program);
+    }
+}
+
+fn print_parser_errors(errors: &Vec<ParseError>) {
+    // TODO: make errors better
+    for error in errors {
+        println!("{}", error);
     }
 }

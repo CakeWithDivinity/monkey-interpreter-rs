@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{
     ast::{
         BlockStatement, BooleanLiteral, Call, Expression, ExpressionStatement, Function,
@@ -7,15 +9,15 @@ use crate::{
     token::{Token, TokenType},
 };
 
-struct Parser {
+pub struct Parser {
     lexer: Lexer,
     current_token: Token,
     peek_token: Token,
-    errors: Vec<ParseError>,
+    pub errors: Vec<ParseError>,
 }
 
 impl Parser {
-    fn new(mut lexer: Lexer) -> Self {
+    pub fn new(mut lexer: Lexer) -> Self {
         let current_token = lexer.next_token();
         let peek_token = lexer.next_token();
 
@@ -32,7 +34,7 @@ impl Parser {
         self.peek_token = self.lexer.next_token();
     }
 
-    fn parse_program(&mut self) -> Program {
+    pub fn parse_program(&mut self) -> Program {
         let mut program = Program { statements: vec![] };
 
         while self.current_token.token_type != TokenType::EOF {
@@ -96,10 +98,7 @@ impl Parser {
         }
 
         // TODO: evaluate value of let expression
-        return Ok(Let {
-            name,
-            value,
-        });
+        return Ok(Let { name, value });
     }
 
     fn parse_expression_statement(&mut self) -> Option<ExpressionStatement> {
@@ -386,16 +385,25 @@ impl From<&TokenType> for Precedence {
 }
 
 #[derive(Debug)]
-enum ParseError {
+pub enum ParseError {
     UnexpectedToken(UnexpectedTokenError),
     // TODO: add message
     ParseExpressionError,
 }
 
 #[derive(Debug)]
-struct UnexpectedTokenError {
+pub struct UnexpectedTokenError {
     expected: String,
     actual: String,
+}
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnexpectedToken(err) => write!(f, "[ParseError]: {}", err),
+            Self::ParseExpressionError => write!(f, "[ParseError]: Could not parse expression"),
+        }
+    }
 }
 
 impl UnexpectedTokenError {
@@ -407,12 +415,22 @@ impl UnexpectedTokenError {
     }
 }
 
+impl Display for UnexpectedTokenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Unexpected Token. Expected: {}, Got: {}",
+            self.expected, self.actual
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::{assert_eq, fmt::format};
+    use std::assert_eq;
 
     use crate::{
-        ast::{Expression, ExpressionStatement, Prefix, Statement},
+        ast::{Expression, ExpressionStatement, Statement},
         lexer::Lexer,
     };
 
