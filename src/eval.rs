@@ -42,16 +42,22 @@ fn eval_prefix_expression(operator: String, right: Object) -> Option<Object> {
 }
 
 fn eval_infix_expression(operator: String, left: Object, right: Object) -> Option<Object> {
-    match (left, right) {
-        (Object::Integer(left), Object::Integer(right)) => {
+    match (left, right, operator.as_str()) {
+        (Object::Integer(left), Object::Integer(right), operator) => {
             eval_integer_infix_expression(operator, left, right)
-        }
+        },
+        (Object::Boolean(left), Object::Boolean(right), "==") => {
+            Some(Object::Boolean(left == right))
+        },
+        (Object::Boolean(left), Object::Boolean(right), "!=") => {
+            Some(Object::Boolean(left != right))
+        },
         _ => None,
     }
 }
 
-fn eval_integer_infix_expression(operator: String, left: isize, right: isize) -> Option<Object> {
-    match operator.as_str() {
+fn eval_integer_infix_expression(operator: &str, left: isize, right: isize) -> Option<Object> {
+    match operator {
         "+" => Some(Object::Integer(left + right)),
         "-" => Some(Object::Integer(left - right)),
         "*" => Some(Object::Integer(left * right)),
@@ -147,6 +153,15 @@ mod tests {
             ("1 != 1", false),
             ("1 == 2", false),
             ("1 != 2", true),
+            ("true == true", true),
+            ("false == false", true),
+            ("true == false", false),
+            ("true != false", true),
+            ("false != true", true),
+            ("(1 < 2) == true", true),
+            ("(1 < 2) == false", false),
+            ("(1 > 2) == true", false),
+            ("(1 > 2) == false", true),
         ];
 
         for test in test_cases {
