@@ -7,6 +7,8 @@ pub fn eval(node: Node) -> Option<Object> {
     match node {
         Node::Expr(Expression::IntegerLiteralExpr(expr)) =>
             Some(Object::Integer(expr.value)),
+        Node::Expr(Expression::BooleanLiteralExpr(expr)) =>
+            Some(Object::Boolean(expr.value)),
         Node::Program(program) =>
             eval_statements(program.statements),
         Node::Stmt(Statement::ExpressionStmt(stmt)) =>
@@ -41,6 +43,32 @@ mod tests {
         }
     }
 
+    fn test_integer_obj(obj: Object, expected: isize) {
+        let Object::Integer(int) = obj else {
+            panic!("Expected Integer Object. Got {:?}", obj);
+        };
+
+        assert_eq!(expected, int);
+    }
+
+    #[test]
+    fn evaluates_boolean_expression() {
+        let test_cases = [("true", true), ("false", false)];
+
+        for test in test_cases {
+            let evaluated = test_eval(test.0);
+            test_boolean_obj(evaluated, test.1);
+        }
+    }
+
+    fn test_boolean_obj(obj: Object, expected: bool) {
+        let Object::Boolean(bool) = obj else {
+            panic!("Expected Boolean Object. Got {:?}", obj);
+        };
+
+        assert_eq!(expected, bool);
+    }
+
     fn test_eval(input: &str) -> Object {
         let lexer = Lexer::new(input.to_string());
         let mut parser = Parser::new(lexer);
@@ -49,11 +77,4 @@ mod tests {
         eval(Node::Program(program)).expect("Input created no output")
     }
 
-    fn test_integer_obj(obj: Object, expected: isize) {
-        let Object::Integer(int) = obj else {
-            panic!("Expected Integer Object. Got {:?}", obj);
-        };
-
-        assert_eq!(expected, int);
-    }
 }
