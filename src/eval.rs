@@ -11,6 +11,12 @@ pub fn eval(node: Node) -> Option<Object> {
             let right = eval(Node::Expr(*expr.right))?;
             eval_prefix_expression(expr.operator, right)
         }
+        Node::Expr(Expression::InfixExpr(expr)) => {
+            let left = eval(Node::Expr(*expr.left_side))?;
+            let right = eval(Node::Expr(*expr.right_side))?;
+
+            eval_infix_expression(expr.operator, left, right)
+        }
         Node::Program(program) => eval_statements(program.statements),
         Node::Stmt(Statement::ExpressionStmt(stmt)) => eval(Node::Expr(stmt.expression)),
         _ => todo!(),
@@ -31,6 +37,29 @@ fn eval_prefix_expression(operator: String, right: Object) -> Option<Object> {
     match operator.as_str() {
         "!" => Some(eval_bang_operator(right)),
         "-" => eval_minus_prefix_operator(right),
+        _ => None,
+    }
+}
+
+fn eval_infix_expression(operator: String, left: Object, right: Object) -> Option<Object> {
+    match (left, right) {
+        (Object::Integer(left), Object::Integer(right)) => {
+            eval_integer_infix_expression(operator, left, right)
+        }
+        _ => None,
+    }
+}
+
+fn eval_integer_infix_expression(operator: String, left: isize, right: isize) -> Option<Object> {
+    match operator.as_str() {
+        "+" => Some(Object::Integer(left + right)),
+        "-" => Some(Object::Integer(left - right)),
+        "*" => Some(Object::Integer(left * right)),
+        "/" => Some(Object::Integer(left / right)),
+        "<" => Some(Object::Boolean(left < right)),
+        ">" => Some(Object::Boolean(left > right)),
+        "==" => Some(Object::Boolean(left == right)),
+        "!=" => Some(Object::Boolean(left != right)),
         _ => None,
     }
 }
@@ -59,7 +88,23 @@ mod tests {
 
     #[test]
     fn evaluates_integer_expr() {
-        let test_cases = [("5", 5), ("10", 10), ("-5", -5), ("-10", -10)];
+        let test_cases = [
+            ("5", 5),
+            ("10", 10),
+            ("-5", -5),
+            ("-10", -10),
+            ("5 + 5 + 5 + 5 - 10", 10),
+            ("2 * 2 * 2 * 2 * 2", 32),
+            ("-50 + 100 + -50", 0),
+            ("5 * 2 + 10", 20),
+            ("5 + 2 * 10", 25),
+            ("20 + 2 * -10", 0),
+            ("50 / 2 * 2 + 10", 60),
+            ("2 * (5 + 10)", 30),
+            ("3 * 3 * 3 + 10", 37),
+            ("3 * (3 * 3) + 10", 37),
+            ("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50),
+        ];
 
         for test in test_cases {
             let evaluated = test_eval(test.0);
@@ -94,6 +139,14 @@ mod tests {
             ("!!true", true),
             ("!!false", false),
             ("!!5", true),
+            ("1 < 2", true),
+            ("1 > 2", false),
+            ("1 < 1", false),
+            ("1 > 1", false),
+            ("1 == 1", true),
+            ("1 != 1", false),
+            ("1 == 2", false),
+            ("1 != 2", true),
         ];
 
         for test in test_cases {
