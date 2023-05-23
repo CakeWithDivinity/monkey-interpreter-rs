@@ -39,6 +39,25 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
                 env: env.clone(),
             }))
         },
+        Node::Expr(Expression::CallExpr(expr)) => {
+            let func = eval(Node::Expr(*expr.function), env)?;
+            if func.is_error() {
+                return Some(func)
+            }
+
+            let args = eval_expressions(expr.arguments, env)?;
+            
+            // TODO: find a way to not create a new Object here
+            if let Some(Object::Error(err)) = args.first() {
+                return Some(Object::Error(err.to_string()));
+            }
+
+            let Object::Func(func) = func else {
+                return None;
+            };
+
+            apply_function(func, args)
+        },
         Node::Program(program) => eval_program(program, env),
         Node::Stmt(Statement::ExpressionStmt(stmt)) => eval(Node::Expr(stmt.expression), env),
         Node::Stmt(Statement::BlockStmt(stmt)) => eval_block_statement(stmt, env),
@@ -60,7 +79,44 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
             env.set(stmt.name.value, value.clone());
             None
         }
-        _ => todo!(),
+    }
+}
+
+fn eval_expressions(exprs: Vec<Expression>, env: &mut Environment) -> Option<Vec<Object>> {
+    let mut result = vec![];
+
+    for expr in exprs {
+        let evaluated = eval(Node::Expr(expr), env)?;
+
+        if evaluated.is_error() {
+            return Some(vec![evaluated]);
+        }
+
+        result.push(evaluated);
+    }
+
+    Some(result)
+}
+
+fn apply_function(func: FuncObject, args: Vec<Object>) -> Option<Object> {
+    let mut env = extend_func_env(func.env, func.params,  args);
+    let evaluated = eval(Node::Stmt(Statement::BlockStmt(func.body)), &mut env)?;
+    
+    Some(unwrap_return_val(evaluated))
+}
+
+fn extend_func_env(mut environment: Environment, params: Vec<Identifier>, args: Vec<Object>) -> Environment {
+    for (param, arg) in params.iter().zip(args) {
+        environment.set(param.value.to_owned(), arg)
+    }
+
+    environment 
+}
+
+fn unwrap_return_val(obj: Object) -> Object {
+    match obj {
+        Object::ReturnValue(val) => *val,
+        _ => obj
     }
 }
 
@@ -387,6 +443,23 @@ mod tests {
         assert_eq!(1, func.params.len());
         assert_eq!("x", func.params.first().unwrap().value);
         assert_eq!("(x + 2)", format!("{}", func.body));
+    }
+
+    #[test]
+    fn evalutes_func_call_expressions() {
+        let test_cases = [
+            ("let identity = fn(x) { x; }; identity(5);", 5),
+            ("let identity = fn(x) { return x; }; identity(5);", 5),
+            ("let double = fn(x) { x * 2; }; double(5);", 10),
+            ("let add = fn(x, y) { x + y; }; add(5, 5);", 10),
+            ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", 20),
+            ("fn(x) { x; }(5)", 5),
+        ];
+
+        for (input, expected) in test_cases {
+            let evaluated = test_eval(input);
+            test_integer_obj(evaluated, expected);
+        }
     }
 
     fn test_null_obj(obj: Object) {
