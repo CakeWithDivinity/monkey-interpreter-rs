@@ -1,6 +1,6 @@
 use crate::{
     ast::{BlockStatement, Expression, Identifier, If, Node, Program, Statement},
-    object::{Environment, Object},
+    object::{Environment, Object, FuncObject},
 };
 
 pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
@@ -32,6 +32,13 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
         }
         Node::Expr(Expression::IfExpr(expr)) => eval_if_expression(expr, env),
         Node::Expr(Expression::IdentifierExpr(expr)) => Some(eval_identifier(expr, env)),
+        Node::Expr(Expression::FunctionExpr(func)) => {
+            Some(Object::Func(FuncObject {
+                params: func.parameters,
+                body: func.body,
+                env: env.clone(),
+            }))
+        },
         Node::Program(program) => eval_program(program, env),
         Node::Stmt(Statement::ExpressionStmt(stmt)) => eval(Node::Expr(stmt.expression), env),
         Node::Stmt(Statement::BlockStmt(stmt)) => eval_block_statement(stmt, env),
@@ -365,6 +372,21 @@ mod tests {
             let evaluated = test_eval(input);
             test_integer_obj(evaluated, expected);
         }
+    }
+
+    #[test]
+    fn evaluates_function_objects() {
+        let input = "fn(x) { x + 2 };";
+
+        let evaluated = test_eval(input);
+
+        let Object::Func(func) = evaluated else {
+            panic!("Expected function obj. Got {:?}", evaluated); 
+        };
+
+        assert_eq!(1, func.params.len());
+        assert_eq!("x", func.params.first().unwrap().value);
+        assert_eq!("(x + 2)", format!("{}", func.body));
     }
 
     fn test_null_obj(obj: Object) {

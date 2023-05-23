@@ -1,4 +1,6 @@
-use std::{fmt::Display, collections::HashMap};
+use std::{collections::HashMap, fmt::Display};
+
+use crate::ast::{BlockStatement, Identifier};
 
 #[derive(Debug, Clone)]
 pub enum Object {
@@ -7,6 +9,7 @@ pub enum Object {
     Null,
     ReturnValue(Box<Object>),
     Error(String),
+    Func(FuncObject),
 }
 
 impl Object {
@@ -21,7 +24,7 @@ impl Object {
         match self {
             Self::Null | Self::Boolean(false) => false,
             Self::Boolean(true) => true,
-            Self::Integer(_) | Self::ReturnValue(_) | Self::Error(_) => true,
+            _ => true,
         }
     }
 }
@@ -34,10 +37,35 @@ impl Display for Object {
             Self::Null => write!(f, "null"),
             Self::ReturnValue(val) => write!(f, "{}", *val),
             Self::Error(err) => write!(f, "[Error]: {}", err),
+            Self::Func(func) => {
+                write!(f, "fn (")?;
+
+                let mut params = func.params.iter().peekable();
+
+                while let Some(param) = params.next() {
+                    if params.peek().is_some() {
+                        write!(f, "{}, ", param)?;
+                    } else {
+                        write!(f, "{}", param)?;
+                    }
+                }
+
+                write!(f, ") {}", func.body)?;
+
+                Ok(())
+            },
         }
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct FuncObject {
+    pub params: Vec<Identifier>,
+    pub body: BlockStatement,
+    pub env: Environment,
+}
+
+#[derive(Debug, Clone)]
 pub struct Environment {
     store: HashMap<String, Object>,
 }
@@ -45,7 +73,7 @@ pub struct Environment {
 impl<'a> Environment {
     pub fn new() -> Environment {
         Self {
-            store: HashMap::new()
+            store: HashMap::new(),
         }
     }
 
