@@ -1,6 +1,6 @@
-use std::fmt::Display;
+use std::{fmt::Display, collections::HashMap};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Object {
     Integer(isize),
     Boolean(bool),
@@ -35,5 +35,25 @@ impl Display for Object {
             Self::ReturnValue(val) => write!(f, "{}", *val),
             Self::Error(err) => write!(f, "[Error]: {}", err),
         }
+    }
+}
+
+pub struct Environment {
+    store: HashMap<String, Object>,
+}
+
+impl<'a> Environment {
+    pub fn new() -> Environment {
+        Self {
+            store: HashMap::new()
+        }
+    }
+
+    pub fn get(&self, key: String) -> Option<&Object> {
+        self.store.get(&key)
+    }
+
+    pub fn set(&mut self, key: String, value: Object) {
+        self.store.insert(key, value);
     }
 }

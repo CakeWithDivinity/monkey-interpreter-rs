@@ -1,56 +1,67 @@
 use crate::{
-    ast::{BlockStatement, Expression, If, Node, Program, Statement},
-    object::Object,
+    ast::{BlockStatement, Expression, Identifier, If, Node, Program, Statement},
+    object::{Environment, Object},
 };
 
-pub fn eval(node: Node) -> Option<Object> {
-    // TODO: if we change Object::Error to an actual error, we can use ? 
+pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
+    // TODO: if we change Object::Error to an actual error, we can use ?
     // for early returns
     match node {
         Node::Expr(Expression::IntegerLiteralExpr(expr)) => Some(Object::Integer(expr.value)),
         Node::Expr(Expression::BooleanLiteralExpr(expr)) => Some(Object::Boolean(expr.value)),
         Node::Expr(Expression::PrefixExpr(expr)) => {
-            let right = eval(Node::Expr(*expr.right))?;
+            let right = eval(Node::Expr(*expr.right), env)?;
             if right.is_error() {
                 return Some(right);
             }
-            
-            Some(eval_prefix_expression(expr.operator, right))
+
+            Some(eval_prefix_expression(expr.operator, &right))
         }
         Node::Expr(Expression::InfixExpr(expr)) => {
-            let left = eval(Node::Expr(*expr.left_side))?;
+            let left = eval(Node::Expr(*expr.left_side), env)?;
             if left.is_error() {
                 return Some(left);
             }
 
-            let right = eval(Node::Expr(*expr.right_side))?;
+            let right = eval(Node::Expr(*expr.right_side), env)?;
             if right.is_error() {
                 return Some(right);
             }
 
-            Some(eval_infix_expression(expr.operator, left, right))
+            Some(eval_infix_expression(expr.operator, &left, &right))
         }
-        Node::Expr(Expression::IfExpr(expr)) => eval_if_expression(expr),
-        Node::Program(program) => eval_program(program),
-        Node::Stmt(Statement::ExpressionStmt(stmt)) => eval(Node::Expr(stmt.expression)),
-        Node::Stmt(Statement::BlockStmt(stmt)) => eval_block_statement(stmt),
+        Node::Expr(Expression::IfExpr(expr)) => eval_if_expression(expr, env),
+        Node::Expr(Expression::IdentifierExpr(expr)) => Some(eval_identifier(expr, env)),
+        Node::Program(program) => eval_program(program, env),
+        Node::Stmt(Statement::ExpressionStmt(stmt)) => eval(Node::Expr(stmt.expression), env),
+        Node::Stmt(Statement::BlockStmt(stmt)) => eval_block_statement(stmt, env),
         Node::Stmt(Statement::ReturnStmt(stmt)) => {
-            let value = eval(Node::Expr(stmt.value))?;
+            let value = eval(Node::Expr(stmt.value), env)?;
             if value.is_error() {
                 return Some(value);
             }
 
-            Some(Object::ReturnValue(Box::new(value)))
+            Some(Object::ReturnValue(Box::new(value.clone())))
+        }
+        Node::Stmt(Statement::LetStmt(stmt)) => {
+            let value = eval(Node::Expr(stmt.value), env)?;
+
+            if value.is_error() {
+                return Some(value);
+            }
+
+            env.set(stmt.name.value, value.clone());
+            None
         }
         _ => todo!(),
     }
 }
 
-fn eval_program(program: Program) -> Option<Object> {
+fn eval_program(program: Program, env: &mut Environment) -> Option<Object> {
     let mut result = None;
 
     for stmt in program.statements {
-        result = eval(Node::Stmt(stmt));
+        result = eval(Node::Stmt(stmt), env);
 
         if let Some(Object::ReturnValue(return_val)) = result {
             return Some(*return_val);
@@ -64,11 +75,11 @@ fn eval_program(program: Program) -> Option<Object> {
     result
 }
 
-fn eval_block_statement(block: BlockStatement) -> Option<Object> {
+fn eval_block_statement(block: BlockStatement, env: &mut Environment) -> Option<Object> {
     let mut result = None;
 
     for stmt in block.statements {
-        result = eval(Node::Stmt(stmt));
+        result = eval(Node::Stmt(stmt), env);
 
         if let Some(Object::ReturnValue(_)) | Some(Object::Error(_)) = result {
             break;
@@ -78,7 +89,7 @@ fn eval_block_statement(block: BlockStatement) -> Option<Object> {
     result
 }
 
-fn eval_prefix_expression(operator: String, right: Object) -> Object {
+fn eval_prefix_expression(operator: String, right: &Object) -> Object {
     match operator.as_str() {
         "!" => eval_bang_operator(right),
         "-" => eval_minus_prefix_operator(right),
@@ -86,19 +97,22 @@ fn eval_prefix_expression(operator: String, right: Object) -> Object {
     }
 }
 
-fn eval_if_expression(expr: If) -> Option<Object> {
-    let condition = eval(Node::Expr(*expr.condition))?;
+fn eval_if_expression(expr: If, env: &mut Environment) -> Option<Object> {
+    let condition = eval(Node::Expr(*expr.condition), env)?;
 
     if condition.is_truthy() {
-        eval(Node::Stmt(Statement::BlockStmt(expr.consequence)))
+        eval(Node::Stmt(Statement::BlockStmt(expr.consequence)), env)
     } else if expr.alternative.is_some() {
-        eval(Node::Stmt(Statement::BlockStmt(expr.alternative.unwrap())))
+        eval(
+            Node::Stmt(Statement::BlockStmt(expr.alternative.unwrap())),
+            env,
+        )
     } else {
         Some(Object::Null)
     }
 }
 
-fn eval_infix_expression(operator: String, left: Object, right: Object) -> Object {
+fn eval_infix_expression(operator: String, left: &Object, right: &Object) -> Object {
     match (left, right, operator.as_str()) {
         (Object::Integer(left), Object::Integer(right), operator) => {
             eval_integer_infix_expression(operator, left, right)
@@ -106,7 +120,7 @@ fn eval_infix_expression(operator: String, left: Object, right: Object) -> Objec
         (Object::Boolean(left), Object::Boolean(right), "==") => Object::Boolean(left == right),
         (Object::Boolean(left), Object::Boolean(right), "!=") => Object::Boolean(left != right),
         (left, right, operator) => {
-            if std::mem::discriminant(&left) == std::mem::discriminant(&right) {
+            if std::mem::discriminant(left) == std::mem::discriminant(right) {
                 Object::Error(format!(
                     "unknown operator: {:?} {} {:?}",
                     left, operator, right
@@ -121,7 +135,7 @@ fn eval_infix_expression(operator: String, left: Object, right: Object) -> Objec
     }
 }
 
-fn eval_integer_infix_expression(operator: &str, left: isize, right: isize) -> Object {
+fn eval_integer_infix_expression(operator: &str, left: &isize, right: &isize) -> Object {
     match operator {
         "+" => Object::Integer(left + right),
         "-" => Object::Integer(left - right),
@@ -138,7 +152,7 @@ fn eval_integer_infix_expression(operator: &str, left: isize, right: isize) -> O
     }
 }
 
-fn eval_bang_operator(right: Object) -> Object {
+fn eval_bang_operator(right: &Object) -> Object {
     match right {
         Object::Boolean(bool) => Object::Boolean(!bool),
         Object::Null => Object::Boolean(true),
@@ -146,16 +160,32 @@ fn eval_bang_operator(right: Object) -> Object {
     }
 }
 
-fn eval_minus_prefix_operator(right: Object) -> Object {
+fn eval_minus_prefix_operator(right: &Object) -> Object {
     match right {
         Object::Integer(int) => Object::Integer(-int),
         _ => Object::Error(format!("unknown operator: -{:?}", right)),
     }
 }
 
+fn eval_identifier(ident: Identifier, env: &Environment) -> Object {
+    let identifier = ident.value.to_owned();
+
+    env.get(ident.value)
+        .unwrap_or(&Object::Error(format!(
+            "identifier not found: {}",
+            identifier
+        )))
+        .clone()
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{ast::Node, lexer::Lexer, object::Object, parser::Parser};
+    use crate::{
+        ast::Node,
+        lexer::Lexer,
+        object::{Environment, Object},
+        parser::Parser,
+    };
 
     use super::eval;
 
@@ -308,6 +338,7 @@ mod tests {
                 ",
                 "unknown operator: Boolean(true) + Boolean(false)",
             ),
+            ("foobar", "identifier not found: foobar"),
         ];
 
         for (input, expected) in test_cases {
@@ -318,6 +349,21 @@ mod tests {
             };
 
             assert_eq!(expected, msg);
+        }
+    }
+
+    #[test]
+    fn evaluates_let_statements() {
+        let test_cases = [
+            ("let a = 5; a;", 5),
+            ("let a = 5 * 5; a;", 25),
+            ("let a = 5; let b = a; b;", 5),
+            ("let a = 5; let b = a; let c = a + b + 5; c;", 15),
+        ];
+
+        for (input, expected) in test_cases {
+            let evaluated = test_eval(input);
+            test_integer_obj(evaluated, expected);
         }
     }
 
@@ -348,6 +394,8 @@ mod tests {
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
 
-        eval(Node::Program(program)).expect("No output")
+        let mut environment = Environment::new();
+
+        eval(Node::Program(program), &mut environment).expect("No output")
     }
 }

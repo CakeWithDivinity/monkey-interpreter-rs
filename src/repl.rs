@@ -1,12 +1,19 @@
-use std::{io::{self, Write}, println};
+use std::{
+    io::{self, Write},
+    println,
+};
 
 use crate::{
-    lexer::Lexer,
-    parser::{ParseError, Parser}, eval::eval,
     ast::Node,
+    eval::eval,
+    lexer::Lexer,
+    object::Environment,
+    parser::{ParseError, Parser},
 };
 
 pub fn run_repl() -> io::Result<()> {
+    let mut environment = Environment::new();
+
     loop {
         print!(">> ");
         std::io::stdout().flush()?;
@@ -24,7 +31,7 @@ pub fn run_repl() -> io::Result<()> {
             continue;
         }
 
-        let output = eval(Node::Program(program));
+        let output = eval(Node::Program(program), &mut environment);
 
         match output {
             Some(output) => println!("{}", output),
