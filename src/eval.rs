@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Expression, Node, Statement, If},
+    ast::{Expression, If, Node, Statement, Program, BlockStatement},
     object::Object,
 };
 
@@ -16,20 +16,42 @@ pub fn eval(node: Node) -> Option<Object> {
             let right = eval(Node::Expr(*expr.right_side))?;
 
             eval_infix_expression(expr.operator, left, right)
-        },
+        }
         Node::Expr(Expression::IfExpr(expr)) => eval_if_expression(expr),
-        Node::Program(program) => eval_statements(program.statements),
+        Node::Program(program) => eval_program(program),
         Node::Stmt(Statement::ExpressionStmt(stmt)) => eval(Node::Expr(stmt.expression)),
-        Node::Stmt(Statement::BlockStmt(stmt)) => eval_statements(stmt.statements),
+        Node::Stmt(Statement::BlockStmt(stmt)) => eval_block_statement(stmt),
+        Node::Stmt(Statement::ReturnStmt(stmt)) => {
+            let value = eval(Node::Expr(stmt.value))?;
+            Some(Object::ReturnValue(Box::new(value)))
+        }
         _ => todo!(),
     }
 }
 
-fn eval_statements(stmts: Vec<Statement>) -> Option<Object> {
+fn eval_program(program: Program) -> Option<Object> {
     let mut result = None;
 
-    for stmt in stmts {
-        result = eval(Node::Stmt(stmt))
+    for stmt in program.statements {
+        result = eval(Node::Stmt(stmt));
+
+        if let Some(Object::ReturnValue(return_val)) = result {
+            return Some(*return_val);
+        }
+    }
+
+    result
+}
+
+fn eval_block_statement(block: BlockStatement) -> Option<Object> {
+    let mut result = None;
+
+    for stmt in block.statements {
+        result = eval(Node::Stmt(stmt));
+
+        if let Some(Object::ReturnValue(_)) = result {
+            break; 
+        }
     }
 
     result
@@ -47,11 +69,11 @@ fn eval_if_expression(expr: If) -> Option<Object> {
     let condition = eval(Node::Expr(*expr.condition))?;
 
     if condition.is_truthy() {
-       eval(Node::Stmt(Statement::BlockStmt(expr.consequence)))
+        eval(Node::Stmt(Statement::BlockStmt(expr.consequence)))
     } else if expr.alternative.is_some() {
         eval(Node::Stmt(Statement::BlockStmt(expr.alternative.unwrap())))
     } else {
-       Some(Object::Null)
+        Some(Object::Null)
     }
 }
 
@@ -199,6 +221,30 @@ mod tests {
                     test_null_obj(evaluated);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn evaluates_return_statements() {
+        let test_cases = [
+            ("return 10;", 10),
+            ("return 10; 9;", 10),
+            ("return 2 * 5; 9;", 10),
+            ("9; return 2 * 5; 9;", 10),
+            (
+                "if (10 > 1) {
+                    if (10 > 1) {
+                        return 10;
+                    }
+                    return 1;
+                }",
+                10,
+            ),
+        ];
+
+        for (input, expected) in test_cases {
+            let evaluated = test_eval(input);
+            test_integer_obj(evaluated, expected);
         }
     }
 
