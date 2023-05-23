@@ -1,21 +1,34 @@
 use crate::{
-    ast::{Expression, If, Node, Statement, Program, BlockStatement},
+    ast::{BlockStatement, Expression, If, Node, Program, Statement},
     object::Object,
 };
 
 pub fn eval(node: Node) -> Option<Object> {
+    // TODO: if we change Object::Error to an actual error, we can use ? 
+    // for early returns
     match node {
         Node::Expr(Expression::IntegerLiteralExpr(expr)) => Some(Object::Integer(expr.value)),
         Node::Expr(Expression::BooleanLiteralExpr(expr)) => Some(Object::Boolean(expr.value)),
         Node::Expr(Expression::PrefixExpr(expr)) => {
             let right = eval(Node::Expr(*expr.right))?;
-            eval_prefix_expression(expr.operator, right)
+            if right.is_error() {
+                return Some(right);
+            }
+            
+            Some(eval_prefix_expression(expr.operator, right))
         }
         Node::Expr(Expression::InfixExpr(expr)) => {
             let left = eval(Node::Expr(*expr.left_side))?;
-            let right = eval(Node::Expr(*expr.right_side))?;
+            if left.is_error() {
+                return Some(left);
+            }
 
-            eval_infix_expression(expr.operator, left, right)
+            let right = eval(Node::Expr(*expr.right_side))?;
+            if right.is_error() {
+                return Some(right);
+            }
+
+            Some(eval_infix_expression(expr.operator, left, right))
         }
         Node::Expr(Expression::IfExpr(expr)) => eval_if_expression(expr),
         Node::Program(program) => eval_program(program),
@@ -23,6 +36,10 @@ pub fn eval(node: Node) -> Option<Object> {
         Node::Stmt(Statement::BlockStmt(stmt)) => eval_block_statement(stmt),
         Node::Stmt(Statement::ReturnStmt(stmt)) => {
             let value = eval(Node::Expr(stmt.value))?;
+            if value.is_error() {
+                return Some(value);
+            }
+
             Some(Object::ReturnValue(Box::new(value)))
         }
         _ => todo!(),
@@ -38,6 +55,10 @@ fn eval_program(program: Program) -> Option<Object> {
         if let Some(Object::ReturnValue(return_val)) = result {
             return Some(*return_val);
         }
+
+        if let Some(Object::Error(_)) = result {
+            return result;
+        }
     }
 
     result
@@ -49,19 +70,19 @@ fn eval_block_statement(block: BlockStatement) -> Option<Object> {
     for stmt in block.statements {
         result = eval(Node::Stmt(stmt));
 
-        if let Some(Object::ReturnValue(_)) = result {
-            break; 
+        if let Some(Object::ReturnValue(_)) | Some(Object::Error(_)) = result {
+            break;
         }
     }
 
     result
 }
 
-fn eval_prefix_expression(operator: String, right: Object) -> Option<Object> {
+fn eval_prefix_expression(operator: String, right: Object) -> Object {
     match operator.as_str() {
-        "!" => Some(eval_bang_operator(right)),
+        "!" => eval_bang_operator(right),
         "-" => eval_minus_prefix_operator(right),
-        _ => None,
+        _ => Object::Error(format!("unknown operator: {}{}", operator, right)),
     }
 }
 
@@ -77,32 +98,43 @@ fn eval_if_expression(expr: If) -> Option<Object> {
     }
 }
 
-fn eval_infix_expression(operator: String, left: Object, right: Object) -> Option<Object> {
+fn eval_infix_expression(operator: String, left: Object, right: Object) -> Object {
     match (left, right, operator.as_str()) {
         (Object::Integer(left), Object::Integer(right), operator) => {
             eval_integer_infix_expression(operator, left, right)
         }
-        (Object::Boolean(left), Object::Boolean(right), "==") => {
-            Some(Object::Boolean(left == right))
+        (Object::Boolean(left), Object::Boolean(right), "==") => Object::Boolean(left == right),
+        (Object::Boolean(left), Object::Boolean(right), "!=") => Object::Boolean(left != right),
+        (left, right, operator) => {
+            if std::mem::discriminant(&left) == std::mem::discriminant(&right) {
+                Object::Error(format!(
+                    "unknown operator: {:?} {} {:?}",
+                    left, operator, right
+                ))
+            } else {
+                Object::Error(format!(
+                    "type mismatch: {:?} {} {:?}",
+                    left, operator, right
+                ))
+            }
         }
-        (Object::Boolean(left), Object::Boolean(right), "!=") => {
-            Some(Object::Boolean(left != right))
-        }
-        _ => None,
     }
 }
 
-fn eval_integer_infix_expression(operator: &str, left: isize, right: isize) -> Option<Object> {
+fn eval_integer_infix_expression(operator: &str, left: isize, right: isize) -> Object {
     match operator {
-        "+" => Some(Object::Integer(left + right)),
-        "-" => Some(Object::Integer(left - right)),
-        "*" => Some(Object::Integer(left * right)),
-        "/" => Some(Object::Integer(left / right)),
-        "<" => Some(Object::Boolean(left < right)),
-        ">" => Some(Object::Boolean(left > right)),
-        "==" => Some(Object::Boolean(left == right)),
-        "!=" => Some(Object::Boolean(left != right)),
-        _ => None,
+        "+" => Object::Integer(left + right),
+        "-" => Object::Integer(left - right),
+        "*" => Object::Integer(left * right),
+        "/" => Object::Integer(left / right),
+        "<" => Object::Boolean(left < right),
+        ">" => Object::Boolean(left > right),
+        "==" => Object::Boolean(left == right),
+        "!=" => Object::Boolean(left != right),
+        _ => Object::Error(format!(
+            "unknown operator: {:?} {} {:?}",
+            left, operator, right
+        )),
     }
 }
 
@@ -114,12 +146,11 @@ fn eval_bang_operator(right: Object) -> Object {
     }
 }
 
-fn eval_minus_prefix_operator(right: Object) -> Option<Object> {
-    let Object::Integer(int) = right else {
-        return None;
-    };
-
-    Some(Object::Integer(-int))
+fn eval_minus_prefix_operator(right: Object) -> Object {
+    match right {
+        Object::Integer(int) => Object::Integer(-int),
+        _ => Object::Error(format!("unknown operator: -{:?}", right)),
+    }
 }
 
 #[cfg(test)]
@@ -245,6 +276,48 @@ mod tests {
         for (input, expected) in test_cases {
             let evaluated = test_eval(input);
             test_integer_obj(evaluated, expected);
+        }
+    }
+
+    #[test]
+    fn returns_errors() {
+        let test_cases = [
+            // TODO: we probably want an error type here
+            // instead of literal string matching
+            ("5 + true;", "type mismatch: Integer(5) + Boolean(true)"),
+            ("5 + true; 5;", "type mismatch: Integer(5) + Boolean(true)"),
+            ("-true", "unknown operator: -Boolean(true)"),
+            (
+                "true + false;",
+                "unknown operator: Boolean(true) + Boolean(false)",
+            ),
+            (
+                "5; true + false; 5",
+                "unknown operator: Boolean(true) + Boolean(false)",
+            ),
+            (
+                "if (10 > 1) { true + false; }",
+                "unknown operator: Boolean(true) + Boolean(false)",
+            ),
+            (
+                "if (10 > 1) {
+                    if (10 > 1) {
+                        return true + false;
+                    }
+                    return 1;
+                ",
+                "unknown operator: Boolean(true) + Boolean(false)",
+            ),
+        ];
+
+        for (input, expected) in test_cases {
+            let evaluated = test_eval(input);
+
+            let Object::Error(msg) = evaluated else {
+                panic!("Expected Error Object. Got {:?}", evaluated);   
+            };
+
+            assert_eq!(expected, msg);
         }
     }
 
