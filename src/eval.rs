@@ -180,6 +180,9 @@ fn eval_infix_expression(operator: String, left: &Object, right: &Object) -> Obj
     match (left, right, operator.as_str()) {
         (Object::Integer(left), Object::Integer(right), operator) => {
             eval_integer_infix_expression(operator, left, right)
+        },
+        (Object::String(left), Object::String(right), "+") => {
+            Object::String(left.to_owned() + right.as_str())
         }
         (Object::Boolean(left), Object::Boolean(right), "==") => Object::Boolean(left == right),
         (Object::Boolean(left), Object::Boolean(right), "!=") => Object::Boolean(left != right),
@@ -466,6 +469,19 @@ mod tests {
     #[test]
     fn evaluates_string_literals() {
         let input = "\"Hello World\"";
+
+        let evaluated = test_eval(input);
+
+        let Object::String(string) = evaluated else {
+            panic!("Expected string obj. Got {:?}", evaluated);
+        };
+
+        assert_eq!("Hello World", string);
+    }
+
+    #[test]
+    fn evaluates_string_concatenation() {
+        let input = "\"Hello\" + \" \" + \"World\"";
 
         let evaluated = test_eval(input);
 
