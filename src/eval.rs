@@ -1,6 +1,7 @@
 use crate::{
     ast::{BlockStatement, Expression, Identifier, If, Node, Program, Statement},
-    object::{Environment, Object, FuncObject},
+    built_in_function::BuiltInFunction,
+    object::{Environment, FuncObject, Object},
 };
 
 pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
@@ -33,32 +34,34 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
         }
         Node::Expr(Expression::IfExpr(expr)) => eval_if_expression(expr, env),
         Node::Expr(Expression::IdentifierExpr(expr)) => Some(eval_identifier(expr, env)),
-        Node::Expr(Expression::FunctionExpr(func)) => {
-            Some(Object::Func(FuncObject {
-                params: func.parameters,
-                body: func.body,
-                env: env.clone(),
-            }))
-        },
+        Node::Expr(Expression::FunctionExpr(func)) => Some(Object::Func(FuncObject {
+            params: func.parameters,
+            body: func.body,
+            env: env.clone(),
+        })),
         Node::Expr(Expression::CallExpr(expr)) => {
             let func = eval(Node::Expr(*expr.function), env)?;
             if func.is_error() {
-                return Some(func)
+                return Some(func);
             }
 
             let args = eval_expressions(expr.arguments, env)?;
-            
+
             // TODO: find a way to not create a new Object here
             if let Some(Object::Error(err)) = args.first() {
                 return Some(Object::Error(err.to_string()));
             }
 
-            let Object::Func(func) = func else {
-                return None;
+            if let Object::Func(func) = func {
+                return apply_function(func, args);
             };
 
-            apply_function(func, args)
-        },
+            if let Object::BuiltInFunc(func) = func {
+                return func.execute(args);
+            }
+
+            None
+        }
         Node::Program(program) => eval_program(program, env),
         Node::Stmt(Statement::ExpressionStmt(stmt)) => eval(Node::Expr(stmt.expression), env),
         Node::Stmt(Statement::BlockStmt(stmt)) => eval_block_statement(stmt, env),
@@ -79,7 +82,7 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
 
             env.set(stmt.name.value, value.clone());
             None
-        },
+        }
     }
 }
 
@@ -100,24 +103,28 @@ fn eval_expressions(exprs: Vec<Expression>, env: &mut Environment) -> Option<Vec
 }
 
 fn apply_function(func: FuncObject, args: Vec<Object>) -> Option<Object> {
-    let mut env = extend_func_env(func.env, func.params,  args);
+    let mut env = extend_func_env(func.env, func.params, args);
     let evaluated = eval(Node::Stmt(Statement::BlockStmt(func.body)), &mut env)?;
-    
+
     Some(unwrap_return_val(evaluated))
 }
 
-fn extend_func_env(mut environment: Environment, params: Vec<Identifier>, args: Vec<Object>) -> Environment {
+fn extend_func_env(
+    mut environment: Environment,
+    params: Vec<Identifier>,
+    args: Vec<Object>,
+) -> Environment {
     for (param, arg) in params.iter().zip(args) {
         environment.set(param.value.to_owned(), arg)
     }
 
-    environment 
+    environment
 }
 
 fn unwrap_return_val(obj: Object) -> Object {
     match obj {
         Object::ReturnValue(val) => *val,
-        _ => obj
+        _ => obj,
     }
 }
 
@@ -180,7 +187,7 @@ fn eval_infix_expression(operator: String, left: &Object, right: &Object) -> Obj
     match (left, right, operator.as_str()) {
         (Object::Integer(left), Object::Integer(right), operator) => {
             eval_integer_infix_expression(operator, left, right)
-        },
+        }
         (Object::String(left), Object::String(right), "+") => {
             Object::String(left.to_owned() + right.as_str())
         }
@@ -237,12 +244,15 @@ fn eval_minus_prefix_operator(right: &Object) -> Object {
 fn eval_identifier(ident: Identifier, env: &Environment) -> Object {
     let identifier = ident.value.to_owned();
 
-    env.get(ident.value)
-        .unwrap_or(&Object::Error(format!(
-            "identifier not found: {}",
-            identifier
-        )))
-        .clone()
+    if let Some(expr) = env.get(ident.value) {
+        return expr.clone();
+    }
+
+    if let Some(func) = BuiltInFunction::from_identifier(&identifier) {
+        return Object::BuiltInFunc(func);
+    }
+
+    Object::Error(format!("identifier not found: {}", identifier))
 }
 
 #[cfg(test)]
@@ -490,6 +500,20 @@ mod tests {
         };
 
         assert_eq!("Hello World", string);
+    }
+
+    #[test]
+    fn evaluates_built_in_functions() {
+        let test_cases = [
+            ("len(\"\")", 0),
+            ("len(\"four\")", 4),
+            ("len(\"Hello world\")", 11),
+        ];
+
+        for (input, expected) in test_cases {
+            let evaluated = test_eval(input);
+            test_integer_obj(evaluated, expected);
+        }
     }
 
     fn test_null_obj(obj: Object) {

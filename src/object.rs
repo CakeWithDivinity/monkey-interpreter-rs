@@ -1,6 +1,9 @@
 use std::{collections::HashMap, fmt::Display};
 
-use crate::ast::{BlockStatement, Identifier};
+use crate::{
+    ast::{BlockStatement, Identifier},
+    built_in_function::BuiltInFunction,
+};
 
 #[derive(Debug, Clone)]
 pub enum Object {
@@ -11,6 +14,7 @@ pub enum Object {
     ReturnValue(Box<Object>),
     Error(String),
     Func(FuncObject),
+    BuiltInFunc(BuiltInFunction),
 }
 
 impl Object {
@@ -39,6 +43,7 @@ impl Display for Object {
             Self::Null => write!(f, "null"),
             Self::ReturnValue(val) => write!(f, "{}", *val),
             Self::Error(err) => write!(f, "[Error]: {}", err),
+            Self::BuiltInFunc(_) => write!(f, "builtin function"),
             Self::Func(func) => {
                 write!(f, "fn (")?;
 
@@ -55,7 +60,7 @@ impl Display for Object {
                 write!(f, ") {}", func.body)?;
 
                 Ok(())
-            },
+            }
         }
     }
 }
