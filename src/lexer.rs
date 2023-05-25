@@ -55,6 +55,7 @@ impl Lexer {
             },
             b'{' => (TokenType::LBRACE, literal_string),
             b'}' => (TokenType::RBRACE, literal_string),
+            b'"' => (TokenType::STRING, self.read_string()),
             0 => (TokenType::EOF, char::from(0).to_string()),
             x if is_letter(x) => {
                 let ident = self.read_identifier();
@@ -102,6 +103,18 @@ impl Lexer {
         let position = self.position;
 
         while is_digit(self.char) {
+            self.read_char();
+        }
+
+        self.input[position..self.position].to_string()
+    }
+
+    fn read_string(&mut self) -> String {
+        let position = self.position + 1;
+
+        self.read_char();
+
+        while self.char != b'"' && self.char != 0 {
             self.read_char();
         }
 
@@ -159,6 +172,8 @@ if(5 < 10) {
 
 10 == 10;
 10 != 9;
+\"foobar\";
+\"foo bar\";
 ";
 
         let expected = [
@@ -234,6 +249,10 @@ if(5 < 10) {
             Token::new(TokenType::INT, "10".to_string()),
             Token::new(TokenType::NEQ, "!=".to_string()),
             Token::new(TokenType::INT, "9".to_string()),
+            Token::new(TokenType::SEMICOLON, ";".to_string()),
+            Token::new(TokenType::STRING, "foobar".to_string()),
+            Token::new(TokenType::SEMICOLON, ";".to_string()),
+            Token::new(TokenType::STRING, "foo bar".to_string()),
             Token::new(TokenType::SEMICOLON, ";".to_string()),
             Token::new(TokenType::EOF, "\0".to_string()),
         ];

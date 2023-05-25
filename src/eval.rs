@@ -9,6 +9,7 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
     match node {
         Node::Expr(Expression::IntegerLiteralExpr(expr)) => Some(Object::Integer(expr.value)),
         Node::Expr(Expression::BooleanLiteralExpr(expr)) => Some(Object::Boolean(expr.value)),
+        Node::Expr(Expression::StringLiteralExpr(expr)) => Some(Object::String(expr.value)),
         Node::Expr(Expression::PrefixExpr(expr)) => {
             let right = eval(Node::Expr(*expr.right), env)?;
             if right.is_error() {
@@ -78,7 +79,7 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
 
             env.set(stmt.name.value, value.clone());
             None
-        }
+        },
     }
 }
 
@@ -460,6 +461,19 @@ mod tests {
             let evaluated = test_eval(input);
             test_integer_obj(evaluated, expected);
         }
+    }
+
+    #[test]
+    fn evaluates_string_literals() {
+        let input = "\"Hello World\"";
+
+        let evaluated = test_eval(input);
+
+        let Object::String(string) = evaluated else {
+            panic!("Expected string obj. Got {:?}", evaluated);
+        };
+
+        assert_eq!("Hello World", string);
     }
 
     fn test_null_obj(obj: Object) {

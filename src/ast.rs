@@ -29,6 +29,7 @@ pub enum Expression {
     IdentifierExpr(Identifier),
     IntegerLiteralExpr(IntegerLiteral),
     BooleanLiteralExpr(BooleanLiteral),
+    StringLiteralExpr(StringLiteral),
     PrefixExpr(Prefix),
     InfixExpr(Infix),
     IfExpr(If),
@@ -49,6 +50,11 @@ pub struct IntegerLiteral {
 #[derive(Debug, Clone)]
 pub struct BooleanLiteral {
     pub value: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct StringLiteral {
+    pub value: String,
 }
 
 #[derive(Debug, Clone)]
@@ -141,6 +147,7 @@ impl Display for Expression {
             Expression::IdentifierExpr(expr) => write!(f, "{}", expr),
             Expression::IntegerLiteralExpr(expr) => write!(f, "{}", expr.value),
             Expression::BooleanLiteralExpr(expr) => write!(f, "{}", expr.value),
+            Expression::StringLiteralExpr(expr) => write!(f, "\"{}\"", expr.value),
             Expression::PrefixExpr(expr) => write!(f, "({}{})", expr.operator, expr.right),
             Expression::InfixExpr(expr) => write!(
                 f,

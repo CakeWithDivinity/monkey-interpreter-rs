@@ -6,6 +6,7 @@ use crate::ast::{BlockStatement, Identifier};
 pub enum Object {
     Integer(isize),
     Boolean(bool),
+    String(String),
     Null,
     ReturnValue(Box<Object>),
     Error(String),
@@ -34,6 +35,7 @@ impl Display for Object {
         match self {
             Self::Integer(int) => write!(f, "{}", int),
             Self::Boolean(bool) => write!(f, "{}", bool),
+            Self::String(string) => write!(f, "\"{}\"", string),
             Self::Null => write!(f, "null"),
             Self::ReturnValue(val) => write!(f, "{}", *val),
             Self::Error(err) => write!(f, "[Error]: {}", err),

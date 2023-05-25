@@ -4,6 +4,7 @@ use crate::{
     ast::{
         BlockStatement, BooleanLiteral, Call, Expression, ExpressionStatement, Function,
         Identifier, If, Infix, IntegerLiteral, Let, Prefix, Program, Return, Statement,
+        StringLiteral,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -135,6 +136,7 @@ impl Parser {
             })),
             TokenType::INT => self.parse_int_literal_expression(),
             TokenType::TRUE | TokenType::FALSE => self.parse_boolean_literal_expression(),
+            TokenType::STRING => self.parse_string_literal(),
             TokenType::BANG | TokenType::MINUS => self.parse_operator_prefix_expression(),
             TokenType::LPAREN => self.parse_grouped_expression(),
             TokenType::IF => self.parse_if_expression(),
@@ -254,6 +256,12 @@ impl Parser {
 
         Some(Expression::BooleanLiteralExpr(BooleanLiteral {
             value: val,
+        }))
+    }
+
+    fn parse_string_literal(&mut self) -> Option<Expression> {
+        Some(Expression::StringLiteralExpr(StringLiteral {
+            value: self.current_token.literal.to_owned(),
         }))
     }
 
@@ -859,5 +867,28 @@ return y;
         assert_eq!("1", format!("{}", call.arguments[0]));
         assert_eq!("(2 * 3)", format!("{}", call.arguments[1]));
         assert_eq!("(4 + 5)", format!("{}", call.arguments[2]));
+    }
+
+    #[test]
+    fn parses_string_literal_expressions() {
+        let input = "\"Hello World\"".to_string();
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        assert_eq!(0, parser.errors.len());
+
+        let stmt = program.statements.first().expect("No statement was parsed");
+
+        let Statement::ExpressionStmt(stmt) = stmt else {
+            panic!("Expected ExpressionStmt. Got {:?}", stmt);
+        };
+
+        let Expression::StringLiteralExpr(string) = &stmt.expression else {
+            panic!("Expected StringLiteralExpr. Got {:?}", stmt.expression);
+        };
+
+        assert_eq!("Hello World", string.value);
     }
 }
