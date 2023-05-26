@@ -15,6 +15,7 @@ pub enum Object {
     Error(String),
     Func(FuncObject),
     BuiltInFunc(BuiltInFunction),
+    Array(Vec<Object>),
 }
 
 impl Object {
@@ -60,6 +61,21 @@ impl Display for Object {
                 write!(f, ") {}", func.body)?;
 
                 Ok(())
+            },
+            Self::Array(elems) => {
+                write!(f, "[")?;
+
+                let mut elems = elems.iter().peekable();
+
+                while let Some(elem) = elems.next() {
+                    if elems.peek().is_some() {
+                        write!(f, "{}, ", elem)?;
+                    } else {
+                        write!(f, "{}", elem)?;
+                    }
+                }
+
+                write!(f, "]")
             }
         }
     }

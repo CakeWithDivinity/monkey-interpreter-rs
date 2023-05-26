@@ -65,7 +65,14 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
             None
         }
         Node::Expr(Expression::ArrayLiteralExpr(arr)) => {
-            todo!()
+            let elements = eval_expressions(arr.elements, env)?;
+            
+            // TODO: find a way to not create a new Object here
+            if let Some(Object::Error(err)) = elements.first() {
+                return Some(Object::Error(err.to_string()))
+            }
+            
+            Some(Object::Array(elements))
         }
         Node::Expr(Expression::IndexExpr(expr)) => {
             todo!()
@@ -296,7 +303,7 @@ mod tests {
 
         for test in test_cases {
             let evaluated = test_eval(test.0);
-            test_integer_obj(evaluated, test.1);
+            assert_integer_obj(&evaluated, test.1);
         }
     }
 
@@ -306,7 +313,7 @@ mod tests {
 
         for test in test_cases {
             let evaluated = test_eval(test.0);
-            test_boolean_obj(evaluated, test.1);
+            assert_boolean_obj(&evaluated, test.1);
         }
     }
 
@@ -340,7 +347,7 @@ mod tests {
 
         for test in test_cases {
             let evaluated = test_eval(test.0);
-            test_boolean_obj(evaluated, test.1);
+            assert_boolean_obj(&evaluated, test.1);
         }
     }
 
@@ -361,10 +368,10 @@ mod tests {
 
             match test.1 {
                 Some(int) => {
-                    test_integer_obj(evaluated, int);
+                    assert_integer_obj(&evaluated, int);
                 }
                 None => {
-                    test_null_obj(evaluated);
+                    assert_null_obj(&evaluated);
                 }
             }
         }
@@ -390,7 +397,7 @@ mod tests {
 
         for (input, expected) in test_cases {
             let evaluated = test_eval(input);
-            test_integer_obj(evaluated, expected);
+            assert_integer_obj(&evaluated, expected);
         }
     }
 
@@ -448,7 +455,7 @@ mod tests {
 
         for (input, expected) in test_cases {
             let evaluated = test_eval(input);
-            test_integer_obj(evaluated, expected);
+            assert_integer_obj(&evaluated, expected);
         }
     }
 
@@ -480,7 +487,7 @@ mod tests {
 
         for (input, expected) in test_cases {
             let evaluated = test_eval(input);
-            test_integer_obj(evaluated, expected);
+            assert_integer_obj(&evaluated, expected);
         }
     }
 
@@ -520,30 +527,46 @@ mod tests {
 
         for (input, expected) in test_cases {
             let evaluated = test_eval(input);
-            test_integer_obj(evaluated, expected);
+            assert_integer_obj(&evaluated, expected);
         }
     }
 
-    fn test_null_obj(obj: Object) {
+    #[test]
+    fn evaluates_array_literals() {
+        let input = "[1, 2 * 2, 3 + 3]";
+
+        let evaluated = test_eval(input);
+
+        let Object::Array(arr) = evaluated else {
+            panic!("Expected ArrayObject. Got {:?}", evaluated);
+        };
+
+        assert_eq!(3, arr.len());
+        assert_integer_obj(&arr[0], 1);
+        assert_integer_obj(&arr[1], 4);
+        assert_integer_obj(&arr[2], 6);
+    }
+
+    fn assert_null_obj(obj: &Object) {
         let Object::Null = obj else {
             panic!("Expected null Object. Got {:?}", obj);
         };
     }
 
-    fn test_integer_obj(obj: Object, expected: isize) {
+    fn assert_integer_obj(obj: &Object, expected: isize) {
         let Object::Integer(int) = obj else {
             panic!("Expected Integer Object. Got {:?}", obj);
         };
 
-        assert_eq!(expected, int);
+        assert_eq!(expected, *int);
     }
 
-    fn test_boolean_obj(obj: Object, expected: bool) {
+    fn assert_boolean_obj(obj: &Object, expected: bool) {
         let Object::Boolean(bool) = obj else {
             panic!("Expected Boolean Object. Got {:?}", obj);
         };
 
-        assert_eq!(expected, bool);
+        assert_eq!(expected, *bool);
     }
 
     fn test_eval(input: &str) -> Object {
