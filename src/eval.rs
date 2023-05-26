@@ -66,16 +66,27 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
         }
         Node::Expr(Expression::ArrayLiteralExpr(arr)) => {
             let elements = eval_expressions(arr.elements, env)?;
-            
+
             // TODO: find a way to not create a new Object here
             if let Some(Object::Error(err)) = elements.first() {
-                return Some(Object::Error(err.to_string()))
+                return Some(Object::Error(err.to_string()));
             }
-            
+
             Some(Object::Array(elements))
         }
         Node::Expr(Expression::IndexExpr(expr)) => {
-            todo!()
+            let left = eval(Node::Expr(*expr.left), env)?;
+
+            if left.is_error() {
+                return Some(left);
+            }
+
+            let index = eval(Node::Expr(*expr.index), env)?;
+            if index.is_error() {
+                return Some(index);
+            }
+
+            Some(eval_index_expression(left, index))
         }
         Node::Program(program) => eval_program(program, env),
         Node::Stmt(Statement::ExpressionStmt(stmt)) => eval(Node::Expr(stmt.expression), env),
@@ -115,6 +126,21 @@ fn eval_expressions(exprs: Vec<Expression>, env: &mut Environment) -> Option<Vec
     }
 
     Some(result)
+}
+
+fn eval_index_expression(left: Object, index: Object) -> Object {
+    match (left, index) {
+        (Object::Array(arr), Object::Integer(index)) => {
+            let Ok(index) = usize::try_from(index) else {
+                return Object::Null;
+            };
+
+            arr.get(index)
+                .map(|obj| obj.clone())
+                .unwrap_or(Object::Null)
+        }
+        (left, _) => Object::Error(format!("index operator not supported on {}", left)),
+    }
 }
 
 fn apply_function(func: FuncObject, args: Vec<Object>) -> Option<Object> {
@@ -545,6 +571,37 @@ mod tests {
         assert_integer_obj(&arr[0], 1);
         assert_integer_obj(&arr[1], 4);
         assert_integer_obj(&arr[2], 6);
+    }
+
+    #[test]
+    fn evaluates_array_index_expressions() {
+        let test_cases = [
+            ("[1, 2, 3][0]", Some(1)),
+            ("[1, 2, 3][1]", Some(2)),
+            ("[1, 2, 3][2]", Some(3)),
+            ("let i = 0; [1][i]", Some(1)),
+            ("[1, 2, 3][1 + 1]", Some(3)),
+            ("let myArray = [1, 2, 3]; myArray[2]", Some(3)),
+            (
+                "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+                Some(6),
+            ),
+            (
+                "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+                Some(2),
+            ),
+            ("[1, 2, 3][3]", None),
+            ("[1, 2, 3][-1]", None),
+        ];
+
+        for (input, expected) in test_cases {
+            let evaluated = test_eval(input);
+
+            match expected {
+                Some(int) => assert_integer_obj(&evaluated, int),
+                None => assert_null_obj(&evaluated),
+            }
+        }
     }
 
     fn assert_null_obj(obj: &Object) {
