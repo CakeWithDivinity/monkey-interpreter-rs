@@ -30,6 +30,7 @@ pub enum Expression {
     IntegerLiteralExpr(IntegerLiteral),
     BooleanLiteralExpr(BooleanLiteral),
     StringLiteralExpr(StringLiteral),
+    ArrayLiteralExpr(ArrayLiteral),
     PrefixExpr(Prefix),
     InfixExpr(Infix),
     IfExpr(If),
@@ -55,6 +56,11 @@ pub struct BooleanLiteral {
 #[derive(Debug, Clone)]
 pub struct StringLiteral {
     pub value: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ArrayLiteral {
+    pub elements: Vec<Expression>, 
 }
 
 #[derive(Debug, Clone)]
@@ -148,6 +154,21 @@ impl Display for Expression {
             Expression::IntegerLiteralExpr(expr) => write!(f, "{}", expr.value),
             Expression::BooleanLiteralExpr(expr) => write!(f, "{}", expr.value),
             Expression::StringLiteralExpr(expr) => write!(f, "\"{}\"", expr.value),
+            Expression::ArrayLiteralExpr(expr) => {
+                write!(f, "[");
+
+                let mut elems = expr.elements.iter().peekable();
+
+                while let Some(elem) = elems.next() {
+                    if elems.peek().is_some() {
+                        write!(f, "{}, ", elem)?;
+                    } else {
+                        write!(f, "{}", elem)?;
+                    }
+                }
+
+                write!(f, "]")
+            },
             Expression::PrefixExpr(expr) => write!(f, "({}{})", expr.operator, expr.right),
             Expression::InfixExpr(expr) => write!(
                 f,

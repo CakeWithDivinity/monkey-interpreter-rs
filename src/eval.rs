@@ -34,6 +34,8 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
         }
         Node::Expr(Expression::IfExpr(expr)) => eval_if_expression(expr, env),
         Node::Expr(Expression::IdentifierExpr(expr)) => Some(eval_identifier(expr, env)),
+        // FIXME: recursive function calls do not work, because the environment
+        // does not include the function that calls itself in it
         Node::Expr(Expression::FunctionExpr(func)) => Some(Object::Func(FuncObject {
             params: func.parameters,
             body: func.body,
@@ -61,7 +63,10 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
             }
 
             None
-        }
+        },
+        Node::Expr(Expression::ArrayLiteralExpr(arr)) => {
+            todo!()
+        },
         Node::Program(program) => eval_program(program, env),
         Node::Stmt(Statement::ExpressionStmt(stmt)) => eval(Node::Expr(stmt.expression), env),
         Node::Stmt(Statement::BlockStmt(stmt)) => eval_block_statement(stmt, env),
