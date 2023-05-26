@@ -50,7 +50,8 @@ impl TokenType {
             | Self::NEQ
             | Self::LT
             | Self::LPAREN
-            | Self::GT => true,
+            | Self::GT
+            | Self::LBRACKET => true,
             _ => false,
         }
     }

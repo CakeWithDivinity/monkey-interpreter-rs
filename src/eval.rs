@@ -63,10 +63,13 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
             }
 
             None
-        },
+        }
         Node::Expr(Expression::ArrayLiteralExpr(arr)) => {
             todo!()
-        },
+        }
+        Node::Expr(Expression::IndexExpr(expr)) => {
+            todo!()
+        }
         Node::Program(program) => eval_program(program, env),
         Node::Stmt(Statement::ExpressionStmt(stmt)) => eval(Node::Expr(stmt.expression), env),
         Node::Stmt(Statement::BlockStmt(stmt)) => eval_block_statement(stmt, env),

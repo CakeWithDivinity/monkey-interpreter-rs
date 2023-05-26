@@ -2,9 +2,9 @@ use std::fmt::Display;
 
 use crate::{
     ast::{
-        BlockStatement, BooleanLiteral, Call, Expression, ExpressionStatement, Function,
-        Identifier, If, Infix, IntegerLiteral, Let, Prefix, Program, Return, Statement,
-        StringLiteral, ArrayLiteral,
+        ArrayLiteral, BlockStatement, BooleanLiteral, Call, Expression, ExpressionStatement,
+        Function, Identifier, If, IndexAccess, Infix, IntegerLiteral, Let, Prefix, Program, Return,
+        Statement, StringLiteral,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -193,7 +193,7 @@ impl Parser {
 
         if self.peek_token.token_type != end_token {
             self.next_token();
-            return None 
+            return None;
         }
 
         self.next_token();
@@ -299,9 +299,13 @@ impl Parser {
     }
 
     fn parse_infix_expression(&mut self, left: Expression) -> Option<Expression> {
-        // TODO: make this call cleaner
+        // TODO: make these calls cleaner
         if self.current_token.token_type == TokenType::LPAREN {
             return self.parse_call_expression(left);
+        }
+
+        if self.current_token.token_type == TokenType::LBRACKET {
+            return self.parse_index_expression(left);
         }
 
         let operator = self.current_token.literal.to_owned();
@@ -313,6 +317,18 @@ impl Parser {
             left_side: Box::new(left),
             operator,
             right_side: Box::new(self.parse_expression(precedence)?),
+        }))
+    }
+
+    fn parse_index_expression(&mut self, left: Expression) -> Option<Expression> {
+        self.next_token();
+        let index = self.parse_expression(Precedence::Lowest)?;
+
+        self.assert_peek_token_safely(TokenType::RBRACKET)?;
+
+        Some(Expression::IndexExpr(IndexAccess {
+            left: Box::new(left),
+            index: Box::new(index),
         }))
     }
 
@@ -387,6 +403,7 @@ enum Precedence {
     Product = 5,
     Prefix = 6,
     Call = 7,
+    Index = 8,
 }
 
 impl From<&TokenType> for Precedence {
@@ -397,6 +414,7 @@ impl From<&TokenType> for Precedence {
             TokenType::PLUS | TokenType::MINUS => Self::Sum,
             TokenType::SLASH | TokenType::ASTERISK => Self::Product,
             TokenType::LPAREN => Self::Call,
+            TokenType::LBRACKET => Self::Index,
             _ => Self::Lowest,
         }
     }
@@ -660,6 +678,14 @@ return y;
             ("2 / (5 + 5)", "(2 / (5 + 5))"),
             ("-(5 + 5)", "(-(5 + 5))"),
             ("!(true == true)", "(!(true == true))"),
+            (
+                "a * [1, 2, 3, 4][b * c] * d",
+                "((a * ([1, 2, 3, 4][(b * c)])) * d)",
+            ),
+            (
+                "add(a * b[2], b[1], 2 * [1, 2][1])",
+                "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
+            ),
         ];
 
         for (input, expected) in test_cases {
@@ -668,7 +694,6 @@ return y;
             let program = parser.parse_program();
 
             assert_eq!(0, parser.errors.len());
-
             assert_eq!(expected, format!("{}", program));
         }
     }
@@ -929,5 +954,31 @@ return y;
             panic!("Expected IntegerLiteralExpr. Got {:?}", stmt.expression);
         };
         assert_eq!(1, int.value);
+    }
+
+    #[test]
+    fn parses_index_expressions() {
+        let input = "myArray[1]".to_string();
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        assert_eq!(0, parser.errors.len());
+
+        let stmt = program.statements.first().expect("No statement was parsed");
+        let Statement::ExpressionStmt(stmt) = stmt else {
+            panic!("Expected ExpressionStmt. Got {:?}", stmt);
+        };
+
+        let Expression::IndexExpr(access) = &stmt.expression else {
+            panic!("Expected IndexExpr. Got {:?}", stmt.expression);
+        };
+
+        assert_eq!("myArray", format!("{}", access.left));
+        let Expression::IntegerLiteralExpr(index) = &*access.index else {
+            panic!("Expected IntegerLiteralExpr. Got {:?}", access.index);
+        };
+        assert_eq!(1, index.value);
     }
 }

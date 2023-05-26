@@ -31,6 +31,7 @@ pub enum Expression {
     BooleanLiteralExpr(BooleanLiteral),
     StringLiteralExpr(StringLiteral),
     ArrayLiteralExpr(ArrayLiteral),
+    IndexExpr(IndexAccess),
     PrefixExpr(Prefix),
     InfixExpr(Infix),
     IfExpr(If),
@@ -61,6 +62,12 @@ pub struct StringLiteral {
 #[derive(Debug, Clone)]
 pub struct ArrayLiteral {
     pub elements: Vec<Expression>, 
+}
+
+#[derive(Debug, Clone)]
+pub struct IndexAccess {
+    pub left: Box<Expression>,
+    pub index: Box<Expression>,
 }
 
 #[derive(Debug, Clone)]
@@ -155,7 +162,7 @@ impl Display for Expression {
             Expression::BooleanLiteralExpr(expr) => write!(f, "{}", expr.value),
             Expression::StringLiteralExpr(expr) => write!(f, "\"{}\"", expr.value),
             Expression::ArrayLiteralExpr(expr) => {
-                write!(f, "[");
+                write!(f, "[")?;
 
                 let mut elems = expr.elements.iter().peekable();
 
@@ -169,6 +176,7 @@ impl Display for Expression {
 
                 write!(f, "]")
             },
+            Expression::IndexExpr(expr) => write!(f, "({}[{}])", expr.left, expr.index),
             Expression::PrefixExpr(expr) => write!(f, "({}{})", expr.operator, expr.right),
             Expression::InfixExpr(expr) => write!(
                 f,
@@ -201,7 +209,7 @@ impl Display for Expression {
                 Ok(())
             }
             Expression::CallExpr(expr) => {
-                write!(f, "{} (", expr.function)?;
+                write!(f, "{}(", expr.function)?;
 
                 let mut args = expr.arguments.iter().peekable();
 
