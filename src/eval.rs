@@ -87,7 +87,8 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
             }
 
             Some(eval_index_expression(left, index))
-        }
+        },
+        Node::Expr(Expression::HashLiteralExpr(expr)) => todo!(),
         Node::Program(program) => eval_program(program, env),
         Node::Stmt(Statement::ExpressionStmt(stmt)) => eval(Node::Expr(stmt.expression), env),
         Node::Stmt(Statement::BlockStmt(stmt)) => eval_block_statement(stmt, env),

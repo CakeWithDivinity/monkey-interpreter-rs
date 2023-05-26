@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 #[derive(Debug, Clone)]
 pub enum Statement {
@@ -31,6 +31,7 @@ pub enum Expression {
     BooleanLiteralExpr(BooleanLiteral),
     StringLiteralExpr(StringLiteral),
     ArrayLiteralExpr(ArrayLiteral),
+    HashLiteralExpr(HashLiteral),
     IndexExpr(IndexAccess),
     PrefixExpr(Prefix),
     InfixExpr(Infix),
@@ -61,13 +62,18 @@ pub struct StringLiteral {
 
 #[derive(Debug, Clone)]
 pub struct ArrayLiteral {
-    pub elements: Vec<Expression>, 
+    pub elements: Vec<Expression>,
 }
 
 #[derive(Debug, Clone)]
 pub struct IndexAccess {
     pub left: Box<Expression>,
     pub index: Box<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct HashLiteral {
+    pub map: HashMap<String, Expression>,
 }
 
 #[derive(Debug, Clone)]
@@ -175,8 +181,18 @@ impl Display for Expression {
                 }
 
                 write!(f, "]")
-            },
+            }
             Expression::IndexExpr(expr) => write!(f, "({}[{}])", expr.left, expr.index),
+            Expression::HashLiteralExpr(expr) => {
+                let elems = expr
+                    .map
+                    .iter()
+                    .map(|(k, v)| format!("{}:{}", k, v))
+                    .collect::<Vec<String>>()
+                    .join(", ");
+
+                write!(f, "{{{}}}", elems)
+            }
             Expression::PrefixExpr(expr) => write!(f, "({}{})", expr.operator, expr.right),
             Expression::InfixExpr(expr) => write!(
                 f,

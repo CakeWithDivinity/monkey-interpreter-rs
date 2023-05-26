@@ -1,10 +1,10 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 use crate::{
     ast::{
         ArrayLiteral, BlockStatement, BooleanLiteral, Call, Expression, ExpressionStatement,
-        Function, Identifier, If, IndexAccess, Infix, IntegerLiteral, Let, Prefix, Program, Return,
-        Statement, StringLiteral,
+        Function, HashLiteral, Identifier, If, IndexAccess, Infix, IntegerLiteral, Let, Prefix,
+        Program, Return, Statement, StringLiteral,
     },
     lexer::Lexer,
     token::{Token, TokenType},
@@ -142,6 +142,7 @@ impl Parser {
             TokenType::IF => self.parse_if_expression(),
             TokenType::FUNCTION => self.parse_function_expression(),
             TokenType::LBRACKET => self.parse_array_expression(),
+            TokenType::LBRACE => self.parse_hash_expression(),
             _ => None,
         }
     }
@@ -166,6 +167,31 @@ impl Parser {
             }
             _ => Some(()),
         }
+    }
+
+    fn parse_hash_expression(&mut self) -> Option<Expression> {
+        let mut map = HashMap::new();
+
+        while self.peek_token.token_type != TokenType::RBRACE {
+            self.next_token();
+            let key = self.parse_expression(Precedence::Lowest)?;
+
+            self.assert_peek_token_safely(TokenType::COLON)?;
+            self.next_token();
+
+            let value = self.parse_expression(Precedence::Lowest)?;
+            map.insert(key.to_string(), value);
+
+            if self.peek_token.token_type != TokenType::RBRACE
+                && self.assert_peek_token_safely(TokenType::COMMA).is_none()
+            {
+                return None;
+            }
+
+        }
+
+        self.assert_peek_token_safely(TokenType::RBRACE)?;
+        Some(Expression::HashLiteralExpr(HashLiteral { map }))
     }
 
     fn parse_array_expression(&mut self) -> Option<Expression> {
@@ -980,5 +1006,52 @@ return y;
             panic!("Expected IntegerLiteralExpr. Got {:?}", access.index);
         };
         assert_eq!(1, index.value);
+    }
+
+    #[test]
+    fn parses_hash_literal_with_string_keys() {
+        let input = "{\"one\": 1, \"two\": 2, \"three\": 3}".to_string();
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        assert_eq!(0, parser.errors.len());
+
+        let stmt = program.statements.first().expect("No statement was parsed");
+        let Statement::ExpressionStmt(
+            ExpressionStatement { expression: Expression::HashLiteralExpr(hash) }
+        ) = stmt else {
+            panic!("Expected ExpressionStatement with HashLiteralExpression. Got {:?}", stmt);
+        };
+
+        assert_eq!(3, hash.map.len());
+
+        let expected = [("\"one\"", 1), ("\"two\"", 2), ("\"three\"", 3)];
+
+        for (key, val) in expected {
+            let value = hash.map.get(key).unwrap();
+            test_integer_literal(value, val);
+        }
+    }
+
+    #[test]
+    fn parses_empty_hash() {
+        let input = "{}".to_string();
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        
+        assert_eq!(0, parser.errors.len());
+
+        let stmt = program.statements.first().expect("No statement was parsed");
+        let Statement::ExpressionStmt(
+            ExpressionStatement { expression: Expression::HashLiteralExpr(hash) }
+        ) = stmt else {
+            panic!("Expected ExpressionStatement with HashLiteralExpression. Got {:?}", stmt);
+        };
+
+        assert_eq!(0, hash.map.len());
     }
 }

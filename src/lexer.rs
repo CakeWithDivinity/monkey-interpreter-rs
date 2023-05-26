@@ -57,6 +57,7 @@ impl Lexer {
             b'}' => (TokenType::RBRACE, literal_string),
             b'[' => (TokenType::LBRACKET, literal_string),
             b']' => (TokenType::RBRACKET, literal_string),
+            b':' => (TokenType::COLON, literal_string),
             b'"' => (TokenType::STRING, self.read_string()),
             0 => (TokenType::EOF, char::from(0).to_string()),
             x if is_letter(x) => {
@@ -177,6 +178,7 @@ if(5 < 10) {
 \"foobar\";
 \"foo bar\";
 [1, 2];
+{\"foo\": \"bar\"};
 ";
 
         let expected = [
@@ -262,6 +264,12 @@ if(5 < 10) {
             Token::new(TokenType::COMMA, ",".to_string()),
             Token::new(TokenType::INT, "2".to_string()),
             Token::new(TokenType::RBRACKET, "]".to_string()),
+            Token::new(TokenType::SEMICOLON, ";".to_string()),
+            Token::new(TokenType::LBRACE, "{".to_string()),
+            Token::new(TokenType::STRING, "foo".to_string()),
+            Token::new(TokenType::COLON, ":".to_string()),
+            Token::new(TokenType::STRING, "bar".to_string()),
+            Token::new(TokenType::RBRACE, "}".to_string()),
             Token::new(TokenType::SEMICOLON, ";".to_string()),
             Token::new(TokenType::EOF, "\0".to_string()),
         ];
