@@ -59,7 +59,7 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
             };
 
             if let Object::BuiltInFunc(func) = func {
-                return func.execute(args);
+                return Some(func.execute(args));
             }
 
             None
