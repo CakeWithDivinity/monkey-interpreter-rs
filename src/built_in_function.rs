@@ -7,6 +7,7 @@ pub enum BuiltInFunction {
     LAST,
     TAIL,
     PUSH,
+    PUTS,
 }
 
 impl BuiltInFunction {
@@ -17,6 +18,7 @@ impl BuiltInFunction {
             "last" => Some(BuiltInFunction::LAST),
             "tail" => Some(BuiltInFunction::TAIL),
             "push" => Some(Self::PUSH),
+            "puts" => Some(Self::PUTS),
             _ => None,
         }
     }
@@ -98,7 +100,14 @@ impl BuiltInFunction {
                         arg
                     )),
                 }
-            }
+            },
+            Self::PUTS => {
+                for arg in args {
+                    println!("{}", arg);
+                }
+                
+                Object::Null
+            },
         }
     }
 }
