@@ -1,9 +1,15 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::{HashMap, hash_map::DefaultHasher}, fmt::Display, hash::{Hash, Hasher}};
 
 use crate::{
     ast::{BlockStatement, Identifier},
     built_in_function::BuiltInFunction,
 };
+
+#[derive(Debug, Clone)]
+pub struct HashPair {
+    key: Object,
+    value: Object,
+}
 
 #[derive(Debug, Clone)]
 pub enum Object {
@@ -16,6 +22,7 @@ pub enum Object {
     Func(FuncObject),
     BuiltInFunc(BuiltInFunction),
     Array(Vec<Object>),
+    Hash(HashMap<u64, HashPair>),
 }
 
 impl Object {
@@ -33,6 +40,22 @@ impl Object {
             _ => true,
         }
     }
+
+    // TODO: error handling
+    pub fn get_hash_key(&self) -> u64 {
+        match self {
+            Self::Boolean(bool) => if *bool { 1 } else { 0 },
+            Self::Integer(int) => u64::try_from(*int).unwrap(),
+            Self::String(string) => calculate_hash(string),
+            _ => todo!(),
+        }
+    }
+}
+
+fn calculate_hash<T: Hash>(val: &T) -> u64 {
+    let mut s = DefaultHasher::new();
+    val.hash(&mut s);
+    s.finish()
 }
 
 impl Display for Object {
@@ -76,7 +99,21 @@ impl Display for Object {
                 }
 
                 write!(f, "]")
-            }
+            },
+            Self::Hash(hash_pairs) => {
+                write!(f, "{{")?;
+
+                let mut entries = hash_pairs.iter().peekable();
+                while let Some((_, entry)) = entries.next() {
+                    if entries.peek().is_some() {
+                        write!(f, "{}: {}, ", entry.key, entry.value)?;
+                    } else {
+                        write!(f, "{}: {}", entry.key, entry.value)?;
+                    }
+                }
+
+                write!(f, "}}")
+            },
         }
     }
 }
@@ -106,5 +143,43 @@ impl<'a> Environment {
 
     pub fn set(&mut self, key: String, value: Object) {
         self.store.insert(key, value);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Object;
+
+    #[test]
+    fn string_hash_keys_are_equal() {
+        let equal_1 = Object::String("Hello world".to_string());
+        let equal_2 = Object::String("Hello world".to_string());
+        
+        let diff_1 = Object::String("foo bar".to_string());
+
+        assert_eq!(equal_1.get_hash_key(), equal_2.get_hash_key());
+        assert!(equal_1.get_hash_key() != diff_1.get_hash_key());
+    }
+
+    #[test]
+    fn boolean_hash_keys_are_equal() {
+        let equal_1 = Object::Boolean(true);
+        let equal_2 = Object::Boolean(true);
+        
+        let diff_1 = Object::Boolean(false);
+
+        assert_eq!(equal_1.get_hash_key(), equal_2.get_hash_key());
+        assert!(equal_1.get_hash_key() != diff_1.get_hash_key());
+    }
+
+    #[test]
+    fn int_hash_keys_are_equal() {
+        let equal_1 = Object::Integer(42);
+        let equal_2 = Object::Integer(42);
+        
+        let diff_1 = Object::Integer(69);
+
+        assert_eq!(equal_1.get_hash_key(), equal_2.get_hash_key());
+        assert!(equal_1.get_hash_key() != diff_1.get_hash_key());
     }
 }
