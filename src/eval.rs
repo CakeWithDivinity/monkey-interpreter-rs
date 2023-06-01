@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     ast::{BlockStatement, Expression, HashLiteral, Identifier, If, Node, Program, Statement},
     built_in_function::BuiltInFunction,
-    object::{Environment, FuncObject, Object, HashPair},
+    object::{Environment, FuncObject, HashPair, Object},
 };
 
 pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
@@ -147,7 +147,7 @@ fn eval_hash_literal(hash: HashLiteral, env: &mut Environment) -> Option<Object>
             return Some(value);
         }
 
-        pairs.insert(hash, HashPair { key, value});
+        pairs.insert(hash, HashPair { key, value });
     }
 
     Some(Object::Hash(pairs))
@@ -164,8 +164,15 @@ fn eval_index_expression(left: Object, index: Object) -> Object {
                 .map(|obj| obj.clone())
                 .unwrap_or(Object::Null)
         }
+        (Object::Hash(hash), index) => eval_hash_index_expression(hash, index),
         (left, _) => Object::Error(format!("index operator not supported on {}", left)),
     }
+}
+
+fn eval_hash_index_expression(hash: HashMap<u64, HashPair>, index: Object) -> Object {
+    hash.get(&index.get_hash_key())
+        .map(|pair| pair.value.clone())
+        .unwrap_or(Object::Null)
 }
 
 fn apply_function(func: FuncObject, args: Vec<Object>) -> Option<Object> {
@@ -662,6 +669,28 @@ mod tests {
 
         for (hash_key, expected_val) in expected.iter() {
             assert_integer_obj(&hash[hash_key].value, *expected_val);
+        }
+    }
+
+    #[test]
+    fn evaluates_hash_index_access_expressions() {
+        let test_cases = [
+            ("{\"foo\": 5}[\"foo\"]", Some(5)),
+            ("{\"foo\": 5}[\"bar\"]", None),
+            ("let key = \"foo\"; {\"foo\": 5}[key]", Some(5)),
+            ("{}[\"foo\"]", None),
+            ("{ 5: 5 }[5]", Some(5)),
+            ("{ true: 5 }[true]", Some(5)),
+            ("{ false: 5 }[false]", Some(5)),
+        ];
+
+        for (input, expected) in test_cases {
+            let evaluated = test_eval(input);
+
+            match (expected, evaluated) {
+                (Some(expected), actual) => assert_integer_obj(&actual, expected),
+                (None, object) => assert_null_obj(&object),
+            }
         }
     }
 
