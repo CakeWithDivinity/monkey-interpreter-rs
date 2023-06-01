@@ -7,8 +7,8 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct HashPair {
-    key: Object,
-    value: Object,
+    pub key: Object,
+    pub value: Object,
 }
 
 #[derive(Debug, Clone)]

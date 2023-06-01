@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use crate::{
-    ast::{BlockStatement, Expression, Identifier, If, Node, Program, Statement},
+    ast::{BlockStatement, Expression, HashLiteral, Identifier, If, Node, Program, Statement},
     built_in_function::BuiltInFunction,
-    object::{Environment, FuncObject, Object},
+    object::{Environment, FuncObject, Object, HashPair},
 };
 
 pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
@@ -87,8 +89,8 @@ pub fn eval(node: Node, env: &mut Environment) -> Option<Object> {
             }
 
             Some(eval_index_expression(left, index))
-        },
-        Node::Expr(Expression::HashLiteralExpr(expr)) => todo!(),
+        }
+        Node::Expr(Expression::HashLiteralExpr(expr)) => eval_hash_literal(expr, env),
         Node::Program(program) => eval_program(program, env),
         Node::Stmt(Statement::ExpressionStmt(stmt)) => eval(Node::Expr(stmt.expression), env),
         Node::Stmt(Statement::BlockStmt(stmt)) => eval_block_statement(stmt, env),
@@ -127,6 +129,28 @@ fn eval_expressions(exprs: Vec<Expression>, env: &mut Environment) -> Option<Vec
     }
 
     Some(result)
+}
+
+fn eval_hash_literal(hash: HashLiteral, env: &mut Environment) -> Option<Object> {
+    let mut pairs = HashMap::new();
+
+    for (key, value) in hash.pairs {
+        let key = eval(Node::Expr(*key), env)?;
+        if key.is_error() {
+            return Some(key);
+        }
+
+        let hash = key.get_hash_key();
+
+        let value = eval(Node::Expr(*value), env)?;
+        if value.is_error() {
+            return Some(value);
+        }
+
+        pairs.insert(hash, HashPair { key, value});
+    }
+
+    Some(Object::Hash(pairs))
 }
 
 fn eval_index_expression(left: Object, index: Object) -> Object {
@@ -602,6 +626,42 @@ mod tests {
                 Some(int) => assert_integer_obj(&evaluated, int),
                 None => assert_null_obj(&evaluated),
             }
+        }
+    }
+
+    #[test]
+    fn evaluates_hash_literals() {
+        let input = "
+            let two = \"two\";
+            {
+                \"one\": 10 - 9,
+                two: 1 + 1,
+                \"thr\" + \"ee\": 6 / 2,
+                4: 4,
+                true: 5,
+                false: 6,
+            }
+        ";
+
+        let expected = [
+            (Object::String("one".to_string()).get_hash_key(), 1),
+            (Object::String("two".to_string()).get_hash_key(), 2),
+            (Object::String("three".to_string()).get_hash_key(), 3),
+            (Object::Integer(4).get_hash_key(), 4),
+            (Object::Boolean(true).get_hash_key(), 5),
+            (Object::Boolean(false).get_hash_key(), 6),
+        ];
+
+        let evaluated = test_eval(input);
+
+        let Object::Hash(hash) = evaluated else {
+            panic!("Expected HashObject. Got {:?}", evaluated);
+        };
+
+        assert_eq!(expected.len(), hash.iter().len());
+
+        for (hash_key, expected_val) in expected.iter() {
+            assert_integer_obj(&hash[hash_key].value, *expected_val);
         }
     }
 

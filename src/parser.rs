@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
 use crate::{
     ast::{
@@ -170,7 +170,7 @@ impl Parser {
     }
 
     fn parse_hash_expression(&mut self) -> Option<Expression> {
-        let mut map = HashMap::new();
+        let mut pairs = vec![];
 
         while self.peek_token.token_type != TokenType::RBRACE {
             self.next_token();
@@ -180,18 +180,17 @@ impl Parser {
             self.next_token();
 
             let value = self.parse_expression(Precedence::Lowest)?;
-            map.insert(key.to_string(), value);
+            pairs.push((Box::new(key), Box::new(value)));
 
             if self.peek_token.token_type != TokenType::RBRACE
                 && self.assert_peek_token_safely(TokenType::COMMA).is_none()
             {
                 return None;
             }
-
         }
 
         self.assert_peek_token_safely(TokenType::RBRACE)?;
-        Some(Expression::HashLiteralExpr(HashLiteral { map }))
+        Some(Expression::HashLiteralExpr(HashLiteral { pairs }))
     }
 
     fn parse_array_expression(&mut self) -> Option<Expression> {
@@ -1025,13 +1024,12 @@ return y;
             panic!("Expected ExpressionStatement with HashLiteralExpression. Got {:?}", stmt);
         };
 
-        assert_eq!(3, hash.map.len());
+        assert_eq!(3, hash.pairs.len());
 
         let expected = [("\"one\"", 1), ("\"two\"", 2), ("\"three\"", 3)];
 
-        for (key, val) in expected {
-            let value = hash.map.get(key).unwrap();
-            test_integer_literal(value, val);
+        for (expected, actual) in expected.iter().zip(&hash.pairs) {
+            test_integer_literal(&*actual.1, expected.1);
         }
     }
 
@@ -1042,7 +1040,7 @@ return y;
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
-        
+
         assert_eq!(0, parser.errors.len());
 
         let stmt = program.statements.first().expect("No statement was parsed");
@@ -1052,6 +1050,6 @@ return y;
             panic!("Expected ExpressionStatement with HashLiteralExpression. Got {:?}", stmt);
         };
 
-        assert_eq!(0, hash.map.len());
+        assert_eq!(0, hash.pairs.len());
     }
 }

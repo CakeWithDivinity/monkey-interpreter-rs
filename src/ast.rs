@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
 #[derive(Debug, Clone)]
 pub enum Statement {
@@ -73,7 +73,7 @@ pub struct IndexAccess {
 
 #[derive(Debug, Clone)]
 pub struct HashLiteral {
-    pub map: HashMap<String, Expression>,
+    pub pairs: Vec<(Box<Expression>, Box<Expression>)>,
 }
 
 #[derive(Debug, Clone)]
@@ -185,7 +185,7 @@ impl Display for Expression {
             Expression::IndexExpr(expr) => write!(f, "({}[{}])", expr.left, expr.index),
             Expression::HashLiteralExpr(expr) => {
                 let elems = expr
-                    .map
+                    .pairs
                     .iter()
                     .map(|(k, v)| format!("{}:{}", k, v))
                     .collect::<Vec<String>>()
